@@ -1,0 +1,5 @@
+# Hosts the Claude Code service may reach through the restricted egress overlay: the API, sign-in
+# and token refresh. Add the domains your MCP servers, web tools and package registries need.
+(^|\.)anthropic\.com$
+(^|\.)claude\.ai$
+(^|\.)claude\.com$

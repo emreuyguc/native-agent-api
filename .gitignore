@@ -1,0 +1,25 @@
+# Build output
+/bin/
+/dist/
+/coverage.out
+/coverage.html
+
+# Local configuration and secrets
+.env
+*.local.env
+
+# Backups of Docker volumes (contain credentials)
+/backups/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Local Compose settings
+/docker/.env
+
+# Local planning notes (not committed)
+/TODO.md
+/acceptance-results/

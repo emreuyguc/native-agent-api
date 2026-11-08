@@ -1,0 +1,41 @@
+# Restricted egress for the claude service (docs/security.md D-3). Combine with compose.yaml and
+# compose.claude.yaml. The agent moves to an internal network without a route out: it reaches the
+# network only through the allowlisting proxy, and the published API port through the ingress
+# forwarder. The gateway then sees every client as the ingress container, so
+# NATIVE_AGENT_ALLOWED_IPS cannot tell clients apart; restrict access with CLAUDE_HOST instead.
+services:
+  claude:
+    networks: [claude-private]
+    ports: !reset []
+    environment:
+      # Both spellings: the CLIs read upper case, curl and wget in the tools only lower case.
+      HTTPS_PROXY: http://claude-egress:8888
+      HTTP_PROXY: http://claude-egress:8888
+      NO_PROXY: localhost,127.0.0.1
+      https_proxy: http://claude-egress:8888
+      http_proxy: http://claude-egress:8888
+      no_proxy: localhost,127.0.0.1
+
+  claude-egress:
+    extends:
+      file: compose.yaml
+      service: edge-base
+    profiles: ["claude"]
+    command: ["tinyproxy", "-d", "-c", "/etc/tinyproxy/tinyproxy.conf"]
+    networks: [default, claude-private]
+    volumes:
+      - ${CLAUDE_EGRESS_ALLOW_FILE:?CLAUDE_EGRESS_ALLOW_FILE must point to the egress allowlist}:/etc/egress/allow:ro
+
+  claude-ingress:
+    extends:
+      file: compose.yaml
+      service: edge-base
+    profiles: ["claude"]
+    command: ["socat", "TCP-LISTEN:8080,fork,reuseaddr", "TCP:claude:8080"]
+    networks: [default, claude-private]
+    ports:
+      - "${CLAUDE_HOST:?CLAUDE_HOST is required}:${CLAUDE_PORT:?CLAUDE_PORT is required}:8080"
+
+networks:
+  claude-private:
+    internal: true

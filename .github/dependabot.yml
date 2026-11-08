@@ -1,0 +1,20 @@
+# Weekly update pull requests for Go modules and the pinned GitHub Actions.
+# The Docker base images (docker/.env.example) and the agent CLI releases
+# (docker/<agent>/release.env) are updated by hand, because Dependabot does not read those files.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      go-modules:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        update-types: [minor, patch]

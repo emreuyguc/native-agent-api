@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 340" width="960" height="340" role="img" aria-labelledby="title desc">
+  <title id="title">How a run works</title>
+  <desc id="desc">1. Your app sends a prompt to native-agent-api with an HTTP POST. 2. The gateway runs the real Claude Code or Codex CLI. 3. Events stream back live over SSE or WebSocket. 4. The result arrives with token usage, and the session can be continued later.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0d1117"/>
+      <stop offset="1" stop-color="#161b22"/>
+    </linearGradient>
+    <linearGradient id="core" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8b5cf6"/>
+      <stop offset="1" stop-color="#3b82f6"/>
+    </linearGradient>
+  </defs>
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .node { fill: #11161f; stroke: #30363d; stroke-width: 1.5; }
+    .title { font-size: 16px; font-weight: 600; fill: #e6edf3; text-anchor: middle; }
+    .sub { font-size: 11.5px; fill: #8b949e; text-anchor: middle; }
+    .track { stroke: #30363d; stroke-width: 2; }
+    .tag { font-size: 11px; text-anchor: middle; }
+    .step { fill: #11161f; stroke: #30363d; stroke-width: 1.5; }
+    .num { font-size: 12px; font-weight: 700; fill: #0d1117; text-anchor: middle; }
+    .stitle { font-size: 13.5px; font-weight: 600; fill: #e6edf3; }
+    .sdesc { font-size: 11px; fill: #8b949e; }
+
+    /* One 8-second cycle: prompt in, CLI works, events stream back, result arrives. */
+    .pk { opacity: 0; animation: 8s linear infinite; }
+    .pk text { font-size: 10.5px; font-weight: 600; text-anchor: middle; }
+    .p1 { animation-name: p1; } .p2 { animation-name: p2; }
+    .e1 { animation-name: e1; } .e2 { animation-name: e2; }
+    .r1 { animation-name: r1; } .r2 { animation-name: r2; }
+    .t2 { animation-delay: 0.25s; } .t3 { animation-delay: 0.5s; }
+    @keyframes p1 { 0% { transform: translate(266px,115px); opacity: 0; } 3% { opacity: 1; } 20% { opacity: 1; } 23%, 100% { transform: translate(364px,115px); opacity: 0; } }
+    @keyframes p2 { 0%, 26% { transform: translate(596px,115px); opacity: 0; } 29% { opacity: 1; } 44% { opacity: 1; } 47%, 100% { transform: translate(694px,115px); opacity: 0; } }
+    @keyframes e1 { 0%, 51% { transform: translate(694px,115px); opacity: 0; } 53% { opacity: 1; } 60% { opacity: 1; } 62%, 100% { transform: translate(596px,115px); opacity: 0; } }
+    @keyframes e2 { 0%, 62% { transform: translate(364px,115px); opacity: 0; } 64% { opacity: 1; } 71% { opacity: 1; } 73%, 100% { transform: translate(266px,115px); opacity: 0; } }
+    @keyframes r1 { 0%, 76% { transform: translate(694px,115px); opacity: 0; } 78% { opacity: 1; } 85% { opacity: 1; } 87%, 100% { transform: translate(596px,115px); opacity: 0; } }
+    @keyframes r2 { 0%, 87% { transform: translate(364px,115px); opacity: 0; } 89% { opacity: 1; } 96% { opacity: 1; } 98%, 100% { transform: translate(266px,115px); opacity: 0; } }
+
+    .hl { animation: hl 8s linear infinite; }
+    .s2 { animation-delay: 2s; } .s3 { animation-delay: 4s; } .s4 { animation-delay: 6s; }
+    @keyframes hl { 0%, 24% { stroke: #3b82f6; fill: #131c2e; } 25%, 100% { stroke: #30363d; fill: #11161f; } }
+    .work { animation: work 8s ease-in-out infinite; }
+    @keyframes work { 0%, 27% { stroke-opacity: 0; } 35%, 45% { stroke-opacity: 1; } 52%, 100% { stroke-opacity: 0; } }
+    .gw { animation: gw 2.4s ease-in-out infinite; }
+    @keyframes gw { 0%, 100% { stroke-opacity: 0.5; } 50% { stroke-opacity: 1; } }
+
+    @media (prefers-reduced-motion: reduce) { .pk, .hl, .work, .gw { animation: none; } }
+  </style>
+
+  <rect x="1" y="1" width="958" height="338" rx="18" fill="url(#bg)" stroke="#30363d"/>
+
+  <!-- Tracks between the three parts -->
+  <line class="track" x1="260" y1="115" x2="370" y2="115"/>
+  <line class="track" x1="590" y1="115" x2="700" y2="115"/>
+
+  <!-- Your app -->
+  <rect class="node" x="40" y="60" width="220" height="110" rx="14"/>
+  <text class="title" x="150" y="108">Your app</text>
+  <text class="sub" x="150" y="130">any language or tool</text>
+
+  <!-- Gateway -->
+  <rect x="370" y="60" width="220" height="110" rx="14" fill="#11161f"/>
+  <rect class="gw" x="370" y="60" width="220" height="110" rx="14" fill="none" stroke="url(#core)" stroke-width="2"/>
+  <text class="title" x="480" y="108">native-agent-api</text>
+  <text class="sub" x="480" y="130">HTTP API on your machine</text>
+
+  <!-- Agent CLI -->
+  <rect class="node" x="700" y="60" width="220" height="110" rx="14"/>
+  <rect class="work" x="700" y="60" width="220" height="110" rx="14" fill="none" stroke="#22c55e" stroke-width="2" stroke-opacity="0"/>
+  <text class="title" x="810" y="98">Agent CLI</text>
+  <rect x="736" y="112" width="68" height="24" rx="7" fill="#1c2230" stroke="#d97757"/>
+  <text class="tag mono" x="770" y="128" fill="#f0a58a">claude</text>
+  <rect x="816" y="112" width="68" height="24" rx="7" fill="#1c2230" stroke="#10a37f"/>
+  <text class="tag mono" x="850" y="128" fill="#6ee7b7">codex</text>
+  <text class="sub" x="810" y="155">real CLI · your own login</text>
+
+  <!-- Moving packets -->
+  <g class="pk p1"><circle r="6" fill="#60a5fa"/><text y="-12" fill="#93c5fd">prompt</text></g>
+  <g class="pk p2"><circle r="6" fill="#60a5fa"/><text y="-12" fill="#93c5fd">prompt</text></g>
+  <g class="pk e1"><circle r="5" fill="#a78bfa"/><text y="-12" fill="#c4b5fd">events</text></g>
+  <g class="pk e1 t2"><circle r="4" fill="#a78bfa"/></g>
+  <g class="pk e1 t3"><circle r="3" fill="#a78bfa"/></g>
+  <g class="pk e2"><circle r="5" fill="#a78bfa"/><text y="-12" fill="#c4b5fd">events</text></g>
+  <g class="pk e2 t2"><circle r="4" fill="#a78bfa"/></g>
+  <g class="pk e2 t3"><circle r="3" fill="#a78bfa"/></g>
+  <g class="pk r1"><circle r="6" fill="#4ade80"/><text y="-12" fill="#86efac">result</text></g>
+  <g class="pk r2"><circle r="6" fill="#4ade80"/><text y="-12" fill="#86efac">result</text></g>
+
+  <!-- Steps -->
+  <rect class="step hl" x="40" y="200" width="205" height="100" rx="12"/>
+  <circle cx="68" cy="228" r="11" fill="#60a5fa"/><text class="num" x="68" y="232">1</text>
+  <text class="stitle" x="88" y="233">Send a prompt</text>
+  <text class="sdesc" x="58" y="262">HTTP request</text>
+  <text class="sdesc mono" x="58" y="280">POST /v1/runs/start</text>
+
+  <rect class="step hl s2" x="265" y="200" width="205" height="100" rx="12"/>
+  <circle cx="293" cy="228" r="11" fill="#22c55e"/><text class="num" x="293" y="232">2</text>
+  <text class="stitle" x="313" y="233">The real CLI works</text>
+  <text class="sdesc" x="283" y="262">its own tools, skills, hooks,</text>
+  <text class="sdesc" x="283" y="280">plugins and MCP servers</text>
+
+  <rect class="step hl s3" x="490" y="200" width="205" height="100" rx="12"/>
+  <circle cx="518" cy="228" r="11" fill="#a78bfa"/><text class="num" x="518" y="232">3</text>
+  <text class="stitle" x="538" y="233">Watch it live</text>
+  <text class="sdesc" x="508" y="262">native events stream back</text>
+  <text class="sdesc" x="508" y="280">over SSE or WebSocket</text>
+
+  <rect class="step hl s4" x="715" y="200" width="205" height="100" rx="12"/>
+  <circle cx="743" cy="228" r="11" fill="#4ade80"/><text class="num" x="743" y="232">4</text>
+  <text class="stitle" x="763" y="233">Get the result</text>
+  <text class="sdesc" x="733" y="262">the answer and token usage;</text>
+  <text class="sdesc" x="733" y="280">continue or fork it later</text>
+
+  <text class="sub" x="480" y="325">Tool use can also wait for your approval: allow once, for the session or for the workspace.</text>
+</svg>
