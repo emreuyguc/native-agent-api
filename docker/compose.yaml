@@ -1,0 +1,47 @@
+# Shared container policy. This file is agent-neutral and is combined with exactly one
+# compose.<agent>.yaml file. The template profile is never started directly.
+name: native-agent-api
+
+services:
+  agent-base:
+    profiles: ["_template"]
+    image: native-agent-api-base:local
+    restart: unless-stopped
+    init: true
+    read_only: true
+    user: "65532:65532"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    # Fork-bomb guard, not a tuning value: it counts threads, and each CLI runtime and its MCP
+    # servers, shells and compilers use dozens.
+    pids_limit: 512
+    tmpfs:
+      # Executable on purpose (Docker defaults tmpfs to noexec): test runners and compilers run binaries from TMPDIR, and noexec
+      # would add nothing while the workspaces under /data are executable anyway. Claude Code
+      # also keeps command output there. It counts against the memory limit.
+      - /tmp:rw,exec,nosuid,nodev,size=256m,uid=65532,gid=65532,mode=700
+    stop_grace_period: 10s
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/native-agent-api", "healthcheck"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  # Templates for the restricted egress overlay (compose.<agent>.egress.yaml).
+  edge-base:
+    profiles: ["_template"]
+    build:
+      context: ..
+      dockerfile: docker/edge/Dockerfile
+      args:
+        RUNTIME_IMAGE: ${RUNTIME_IMAGE:?RUNTIME_IMAGE is required}
+    image: native-agent-api-edge:local
+    restart: unless-stopped
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 64
+    mem_limit: 64m
+

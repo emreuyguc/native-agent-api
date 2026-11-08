@@ -1,0 +1,8 @@
+*
+!go.mod
+!go.sum
+!cmd/
+!internal/
+!docker/claude/release.env
+!docker/codex/release.env
+!docker/edge/tinyproxy.conf

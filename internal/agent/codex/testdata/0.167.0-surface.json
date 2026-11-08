@@ -1,0 +1,42 @@
+{
+  "version": "0.167.0",
+  "protocol": "app-server-v2-stdio",
+  "client_requests": [
+    "account/rateLimits/read",
+    "account/read",
+    "account/usage/read",
+    "hooks/list",
+    "initialize",
+    "mcpServerStatus/list",
+    "model/list",
+    "skills/list",
+    "thread/fork",
+    "thread/list",
+    "thread/read",
+    "thread/resume",
+    "thread/start",
+    "turn/interrupt",
+    "turn/start"
+  ],
+  "server_requests": [
+    "item/commandExecution/requestApproval",
+    "item/fileChange/requestApproval"
+  ],
+  "notifications": [
+    "error",
+    "item/completed",
+    "item/started",
+    "thread/tokenUsage/updated",
+    "turn/completed",
+    "turn/started"
+  ],
+  "commands": [
+    "app-server",
+    "doctor",
+    "exec",
+    "fork",
+    "login",
+    "mcp",
+    "resume"
+  ]
+}

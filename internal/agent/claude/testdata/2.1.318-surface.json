@@ -1,0 +1,58 @@
+{
+  "version": "2.1.318",
+  "normalization": "Canonical long option names; aliases are collapsed, command aliases are split, and option details are recorded for API-used subcommands while native-management trees are classified at their root.",
+  "root_options": {
+    "api": [
+      "--add-dir", "--agent", "--agents", "--allow-dangerously-skip-permissions",
+      "--allowed-tools", "--append-system-prompt", "--autocompact", "--bare", "--betas",
+      "--brief", "--debug", "--disable-slash-commands", "--disallowed-tools", "--effort",
+      "--exclude-dynamic-system-prompt-sections", "--fallback-model", "--file", "--fork-session",
+      "--forward-subagent-text", "--include-hook-events", "--include-partial-messages",
+      "--input-format", "--json-schema", "--max-budget-usd", "--mcp-config", "--model", "--name",
+      "--no-session-persistence", "--output-format", "--permission-mode", "--permission-prompts",
+      "--plugin-dir", "--plugin-url", "--print", "--prompt-suggestions", "--replay-user-messages",
+      "--restricted", "--resume", "--safe-mode", "--session-id", "--setting-sources", "--settings",
+      "--strict-mcp-config", "--system-prompt", "--system-prompt-snapshot", "--tools", "--verbose",
+      "--version"
+    ],
+    "native_only": [
+      "--ax-screen-reader", "--background", "--chrome", "--cloud", "--continue",
+      "--dangerously-skip-permissions", "--desktop", "--environment", "--from-pr", "--help",
+      "--ide", "--no-chrome", "--remote-control", "--remote-control-session-name-prefix",
+      "--teleport", "--tmux", "--worktree"
+    ],
+    "gateway_policy": ["--debug-file"]
+  },
+  "hidden_options_used_by_adapter": ["--max-turns", "--permission-prompt-tool", "--system-prompt-file"],
+  "root_commands": {
+    "api": ["auth", "doctor"],
+    "native_management": [
+      "agents", "attach", "auto-mode", "gateway", "import", "install", "kill", "logs", "mcp", "plugin",
+      "plugins", "purge", "respawn", "rm", "setup-token", "stop", "ultrareview", "update",
+      "upgrade"
+    ]
+  },
+  "auth_commands": {
+    "api": ["login", "status"],
+    "native_management": ["logout"]
+  },
+  "command_options": {
+    "auth": {
+      "native_only": ["--help"]
+    },
+    "auth login": {
+      "native_flow": ["--claudeai", "--console", "--email", "--sso"],
+      "native_only": ["--help"]
+    },
+    "auth logout": {
+      "native_only": ["--help"]
+    },
+    "auth status": {
+      "api": ["--json", "--text"],
+      "native_only": ["--help"]
+    },
+    "doctor": {
+      "native_only": ["--help"]
+    }
+  }
+}
