@@ -52,7 +52,7 @@ func (a *Agent) oauthAccessToken(ctx context.Context) (string, error) {
 func (a *Agent) keychainAccessToken(ctx context.Context, service string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, a.opts.CommandTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, securityTool, "find-generic-password", "-s", service, "-a", a.opts.User, "-w")
+	cmd := exec.CommandContext(ctx, securityTool, "find-generic-password", "-s", service, "-a", a.opts.User, "-w") //nolint:gosec // G204: the fixed macOS security tool; arguments are separate, no shell.
 	cmd.Env = []string{"PATH=/usr/bin:/bin", "HOME=" + a.opts.HomeDir, "USER=" + a.opts.User}
 	output, err := cmd.Output()
 	if err != nil {

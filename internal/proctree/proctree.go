@@ -17,7 +17,7 @@ import (
 
 // Command builds a process in its own process group; cancelling ctx kills its tree.
 func Command(ctx context.Context, binary string, args ...string) *exec.Cmd {
-	cmd := exec.CommandContext(ctx, binary, args...)
+	cmd := exec.CommandContext(ctx, binary, args...) //nolint:gosec // G204: starting the agent CLI is the purpose of this package; callers validate the arguments.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error { return KillTree(cmd.Process.Pid) }
 	cmd.WaitDelay = 5 * time.Second

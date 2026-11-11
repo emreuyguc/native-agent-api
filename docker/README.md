@@ -167,6 +167,10 @@ RUN apk add --no-cache nodejs npm python3
 USER 65532:65532
 ```
 
+Each CLI keeps its own license. Codex CLI is Apache-2.0. Claude Code is proprietary; its use is
+subject to Anthropic's [Commercial Terms](https://www.anthropic.com/legal/commercial-terms). The
+images hold no account or credentials: you log in with your own.
+
 ## Upgrade from 0.1.0
 
 0.1.0 used one `docker/.env` for both agents, with `compose.<agent>.yaml` overlays and profiles.

@@ -30,6 +30,7 @@ cache for the images.
 | Target | Checks | CI job |
 |---|---|---|
 | `verify-modules`, `lint-go`, `lint-workflows`, `check-coverage`, `scan-vulnerabilities`, `lint-scripts`, `check-release-config` | Modules, Go lint, workflow lint, tests and coverage, known vulnerabilities, shell scripts, `.goreleaser.yaml` | `ci` / `check` |
+| `test` | The tests on macOS, for the darwin binaries | `ci` / `macos` |
 | `audit-workflows` | Workflow security (zizmor) | `ci` / `workflows` |
 | `check-api-compatibility BASE=…` | API changes that break clients | `api` / `breaking-changes` |
 | `test-fuzz FUZZTIME=…` | New fuzz inputs; `check-all` uses 10 seconds per target | `fuzz`, weekly with 2 minutes |
@@ -37,8 +38,18 @@ cache for the images.
 | `build-release-snapshot` | The release archives and SBOMs in `dist/`, without publishing | `release` publishes them |
 
 `make test` reuses the results of packages that did not change; `TESTFLAGS=-count=1` runs every
-test, as CI does. `check-pre-push` and `check-all` compare the API with `origin/main`; pass
-`BASE=` for another base.
+test. CI also passes `-shuffle=on`, which runs the tests in random order. `check-pre-push` and
+`check-all` compare the API with `origin/main`; pass `BASE=` for another base.
+
+`lint-go` also enforces two project rules from `AGENTS.md`:
+
+| Linter | Rule |
+|---|---|
+| `depguard` | Only `internal/agent/builtin` imports an adapter package |
+| `forbidigo` | Only `internal/cli` reads the process environment |
+
+`check-coverage` checks the total and, for the packages that guard a security boundary, a limit
+per package (`.testcoverage.yml`).
 
 `make install-git-hooks` makes git run `check-pre-commit` before each commit and `check-pre-push`
 before each push (`.githooks/`); `make uninstall-git-hooks` stops it. The commit hook refuses
