@@ -23,7 +23,8 @@ published port, and keeps `/data`, `/projects` and `HOME` in named volumes. Buil
 checkout: the image reads its version from it.
 
 Each release also publishes the images on GHCR as `ghcr.io/emreuyguc/native-agent-api-<agent>` and
-`-edge`; see [releasing](../docs/releasing.md). The Compose files build the image from source.
+`-edge`; see [releasing](../docs/releasing.md). To run one instead of building from source, add
+`docker/compose.release.yaml` to `COMPOSE_FILE` and set `CONTAINER_RELEASE` to its version.
 
 ## Setup
 

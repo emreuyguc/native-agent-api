@@ -11,6 +11,8 @@ All notable changes to this project are documented here. The format is based on
 - Releases: a version tag publishes the binaries for linux and darwin (amd64, arm64) on GitHub and
   the images on GHCR, with an SBOM and signed build provenance. `docs/releasing.md` describes the
   release steps and `gh attestation verify`.
+- Docker: `docker/compose.release.yaml` runs the published agent image of `CONTAINER_RELEASE`
+  instead of building it from source.
 - The API document lists every fixed value: an `enum` for request fields (login `method`,
   `provider` options such as `permission_mode` and `reasoning_summary`, `agent.name`), and the
   values with their meaning in the description of `code`, `error.code` and `capabilities`.
