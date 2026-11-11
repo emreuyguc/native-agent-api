@@ -70,8 +70,8 @@ CLI: `make test-host AGENT=claude|codex`.
 
 | ID | Attack | Protection | Test |
 |---|---|---|---|
-| F-1 | DNS rebinding: without a token on loopback, a web page starts a `bypass` run | Without a token, only IP and `localhost` Host names are served | `TestBrowserGuard` |
-| F-2 | Cross-site form post: a web page logs out, starts a login, creates a workspace or cancels a run | Cross-origin state changes are rejected in every mode | `TestBrowserGuard` |
+| F-1 | DNS rebinding: without a token on loopback, a web page starts a `bypass` run | Without a token, only IP and `localhost` Host names are served | `TestBrowserGuard`, `FuzzLiteralHost` |
+| F-2 | Cross-site form post: a web page logs out, starts a login, creates a workspace or cancels a run | Cross-origin state changes are rejected in every mode | `TestBrowserGuard`, `FuzzCrossOrigin` |
 | F-3 | Flag injection: `allowed_tools: ["--settings={...}"]` becomes a Claude flag and overrides the sandbox | Tool rules never start with `-` | `TestParseOptionsRejectsUnsafeOrInvalidValues` |
 | F-4 | A FIFO in the workspace makes download or copy hang forever | Files open with `O_NONBLOCK`; only single-link regular files are served | `TestSpecialFilesNeverBlock` |
 | F-5 | A parent swapped for a symlink between check and use escapes the workspace | Every operation runs on an `os.Root` of the workspace | `TestSwappedParentCannotEscape` |

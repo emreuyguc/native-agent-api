@@ -45,6 +45,8 @@ All notable changes to this project are documented here. The format is based on
 
 ### Security
 
+- Without a token, the browser guard rejects a malformed `Host` header, such as `[:::` or a
+  non-numeric port, instead of reading an IP address from it. A new fuzz test found it.
 - Go 1.27.4, which fixes GO-2026-6859 in `net/http`. The Docker build image is pinned to it.
 
 ## [0.1.0] - 2026-11-07
