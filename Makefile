@@ -11,7 +11,8 @@ LDFLAGS := -s -w \
 
 # Development tools. Go tools have their own modules in tools/; the other tools run from the image
 # in tools/docker/<name>/Dockerfile. Dependabot updates both, and CI runs the same versions.
-GOLANGCI_LINT := go tool -modfile=tools/golangci-lint/go.mod golangci-lint
+# CI installs the same golangci-lint version as a binary and passes GOLANGCI_LINT=golangci-lint.
+GOLANGCI_LINT ?= go tool -modfile=tools/golangci-lint/go.mod golangci-lint
 TOOLS := go tool -modfile=tools/go.mod
 GO_MODULES := . tools tools/golangci-lint
 tool_image = $(shell sed -n 's/^FROM //p' tools/docker/$(1)/Dockerfile)
@@ -31,9 +32,10 @@ format-code: ## Format Go files
 lint-go: ## Run static analysis
 	$(GOLANGCI_LINT) run ./...
 
+# Locally Go reuses the results of unchanged packages. CI passes TESTFLAGS=-count=1 to run all.
 .PHONY: test
-test: ## Run tests with the race detector and write coverage.out
-	go test -race -count=1 -coverprofile=coverage.out ./...
+test: ## Run tests with the race detector and write coverage.out (TESTFLAGS=-count=1 runs all)
+	go test -race $(TESTFLAGS) -coverprofile=coverage.out ./...
 
 .PHONY: check-coverage
 check-coverage: test ## Check the test coverage against .testcoverage.yml; writes coverage.txt
@@ -98,31 +100,45 @@ build-images: ## Build the Docker images without pushing (IMAGE=claude|codex|edg
 # The image may have an older Go than go.mod; GOTOOLCHAIN=auto fetches the right one into a
 # volume, so the next run reuses it.
 build-release-snapshot: ## Build the release archives and SBOMs into dist/ without publishing (GoReleaser, Docker)
-	docker run --rm -v "$(CURDIR)":/src -w /src -v native-agent-api-goreleaser:/go \
+	docker run --rm -v "$(CURDIR)":/src -w /src -v native-agent-api-goreleaser:/go -e GOCACHE=/go/cache \
 	  -e GOTOOLCHAIN=auto -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/src \
 	  $(call tool_image,goreleaser) release --snapshot --clean --skip=publish
 
-# The two levels, named after when they run. `make install-git-hooks` makes git run them; CI runs the same
-# targets. docs/development.md lists which CI job runs which target.
+.PHONY: check-release-config
+check-release-config: ## Validate .goreleaser.yaml (GoReleaser, Docker)
+	docker run --rm -v "$(CURDIR)":/src:ro -w /src $(call tool_image,goreleaser) check
+
+# Three levels. The git hooks run the first two; check-all adds the slow builds that CI runs on
+# every pull request. docs/development.md lists which CI job runs which target.
 .PHONY: check-pre-commit
 check-pre-commit: verify-modules lint-go lint-workflows check-coverage scan-vulnerabilities ## Before a commit: Go checks, tests and coverage (needs only Go)
 	@echo "check-pre-commit: OK"
 
 .PHONY: check-pre-push
-check-pre-push: check-pre-commit audit-workflows lint-scripts check-api-compatibility test-fuzz build-images build-release-snapshot ## Before a push: every CI check that runs locally (needs Docker)
+check-pre-push: check-pre-commit audit-workflows lint-scripts check-api-compatibility check-release-config ## Before a push: adds workflow, script, API and release checks (needs Docker)
 	@echo "check-pre-push: OK"
 
-check-pre-push: BASE ?= origin/main
-check-pre-push: FUZZTIME ?= 10s
+.PHONY: check-all
+check-all: check-pre-push test-fuzz build-images build-release-snapshot ## Everything CI runs that works locally: adds fuzzing, images and release archives
+	@echo "check-all: OK"
 
+check-pre-push check-all: BASE ?= origin/main
+check-all: FUZZTIME ?= 10s
+
+# Another hooks directory stays: install refuses to replace it, and uninstall removes only ours.
 .PHONY: install-git-hooks
 install-git-hooks: ## Make git run check-pre-commit before each commit and check-pre-push before each push
+	@current=$$(git config --local --get core.hooksPath || true); \
+	if [ -n "$$current" ] && [ "$$current" != .githooks ]; then \
+	  echo "core.hooksPath is already $$current; remove it first"; exit 1; fi
 	git config --local core.hooksPath .githooks
 	@echo "git hooks: .githooks (remove with: make uninstall-git-hooks)"
 
 .PHONY: uninstall-git-hooks
 uninstall-git-hooks: ## Stop git from running the checks before commits and pushes
-	git config --local --unset core.hooksPath
+	@if [ "$$(git config --local --get core.hooksPath || true)" = .githooks ]; then \
+	  git config --local --unset core.hooksPath; echo "git hooks: removed"; \
+	else echo "git hooks: not installed by this repository"; fi
 
 .PHONY: build
 build: ## Build the local binary

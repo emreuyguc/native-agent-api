@@ -1,3 +1,16 @@
 #!/bin/sh
 # Installed by `make install-git-hooks`. Skip once with: git push --no-verify
+# The checks read the working tree, so every pushed commit must be the checked-out one.
+head=$(git rev-parse HEAD)
+zero=0000000000000000000000000000000000000000
+while read -r _ local_sha _ _; do
+  if [ "$local_sha" != "$zero" ] && [ "$local_sha" != "$head" ]; then
+    echo "pre-push: $local_sha is not the checked-out commit; check it out first, or push with --no-verify" >&2
+    exit 1
+  fi
+done
+if ! git diff --quiet HEAD; then
+  echo "pre-push: the working tree differs from HEAD; commit or stash the changes first" >&2
+  exit 1
+fi
 exec make check-pre-push

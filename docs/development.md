@@ -17,24 +17,34 @@ pass `ENV_FILE=path` for another file. Tests that need the real CLIs are describ
 
 ## Checks
 
-Every check is a `make` target. CI calls the same targets, so a check that passes locally passes
-in CI, and the checks move with the repository to another CI service.
+Every check is a `make` target, and CI runs the same checks with the same tool versions. Where
+GitHub does it faster, CI uses its own tools: the released golangci-lint binary and a BuildKit
+cache for the images.
 
-| Target | When | What it runs | CI job |
+| Target | When | What it runs | Time (warm) |
 |---|---|---|---|
-| `make check-pre-commit` | Before a commit | `verify-modules`, `lint-go`, `lint-workflows`, `check-coverage` (runs `test`), `scan-vulnerabilities` | `ci` / `check` |
-| `make check-pre-push` | Before a push; needs Docker | `check-pre-commit`, then `audit-workflows`, `lint-scripts`, `check-api-compatibility`, `test-fuzz`, `build-images`, `build-release-snapshot` | All jobs below |
-| `make audit-workflows` | | Workflow security (zizmor) | `ci` / `workflows` |
-| `make lint-scripts` | | Shell scripts (ShellCheck) | `ci` / `check` |
-| `make check-api-compatibility BASE=…` | | API changes that break clients | `api` / `breaking-changes` |
-| `make test-fuzz FUZZTIME=…` | | New fuzz inputs; `check-pre-push` uses 10 seconds per target | `fuzz`, weekly with 2 minutes |
-| `make build-images` | | The Docker images, without pushing | `ci` / `docker` (amd64 and arm64) |
-| `make build-release-snapshot` | | The release archives and SBOMs in `dist/`, without publishing | `release` publishes them |
+| `make check-pre-commit` | Before a commit; needs only Go | `verify-modules`, `lint-go`, `lint-workflows`, `check-coverage` (runs `test`), `scan-vulnerabilities` | Seconds when little changed; about 50 s from scratch |
+| `make check-pre-push` | Before a push; needs Docker | `check-pre-commit`, then `audit-workflows`, `lint-scripts`, `check-api-compatibility`, `check-release-config` | About 30 s more |
+| `make check-all` | Before a release or a large change | `check-pre-push`, then `test-fuzz`, `build-images`, `build-release-snapshot` | Some minutes |
 
-`check-pre-push` compares the API with `origin/main`; pass `BASE=` for another base.
+| Target | Checks | CI job |
+|---|---|---|
+| `verify-modules`, `lint-go`, `lint-workflows`, `check-coverage`, `scan-vulnerabilities`, `lint-scripts` | Modules, Go lint, workflow lint, tests and coverage, known vulnerabilities, shell scripts | `ci` / `check` |
+| `audit-workflows` | Workflow security (zizmor) | `ci` / `workflows` |
+| `check-api-compatibility BASE=…` | API changes that break clients | `api` / `breaking-changes` |
+| `check-release-config` | `.goreleaser.yaml` | `release` |
+| `test-fuzz FUZZTIME=…` | New fuzz inputs; `check-all` uses 10 seconds per target | `fuzz`, weekly with 2 minutes |
+| `build-images` | The Docker images, without pushing | `ci` / `docker` (amd64 and arm64) |
+| `build-release-snapshot` | The release archives and SBOMs in `dist/`, without publishing | `release` publishes them |
+
+`make test` reuses the results of packages that did not change; `TESTFLAGS=-count=1` runs every
+test, as CI does. `check-pre-push` and `check-all` compare the API with `origin/main`; pass
+`BASE=` for another base.
+
 `make install-git-hooks` makes git run `check-pre-commit` before each commit and `check-pre-push`
-before each push (`.githooks/`); `make uninstall-git-hooks` stops it. Skip a hook once with
-`--no-verify`.
+before each push (`.githooks/`); `make uninstall-git-hooks` stops it. The commit hook refuses
+unstaged changes, and the push hook refuses to push a commit other than the checked-out one: the
+checks read the working tree. Skip a hook once with `--no-verify`.
 
 Only GitHub can run these: the dependency review, CodeQL, OpenSSF Scorecard, and the signed
 provenance and publishing of a release.
