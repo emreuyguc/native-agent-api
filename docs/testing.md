@@ -4,7 +4,7 @@
 |---|---|---|
 | Unit tests, lint, vulnerability scan | `make check` | Nothing else; runs in CI |
 | Fuzz tests with new inputs | `make fuzz FUZZTIME=1m` | Nothing else; runs in CI every week |
-| Test coverage | `make coverage` | Nothing else; CI shows it on pull requests |
+| Test coverage | `make coverage` | Nothing else; runs in CI |
 | Real CLI tests | `make test-host AGENT=claude\|codex` | The CLI and its login; a few small model calls |
 | End-to-end checks | `scripts/acceptance.sh` | A login; starts or uses a gateway |
 | Docker image | `docker/verify.sh docker/<name>.env` | Docker with Compose v2 |
@@ -13,9 +13,8 @@
 inputs. When it finds a failing one, Go saves it under `testdata/fuzz/`; commit it with the fix, so
 it stays a regression test.
 
-`make coverage` writes `coverage.out` for `go tool cover` and `coverage.xml` in Cobertura format.
-The `coverage` workflow uploads the XML to GitHub Code Quality, which shows the coverage on each
-pull request.
+`make coverage` fails when coverage falls below the limit in `.testcoverage.yml`. CI checks the
+same limit and writes the coverage to the run summary.
 
 Run `make check` before every pull request. The other levels use the real CLIs and your login, so
 CI cannot run them; run them when a change touches an adapter, the run lifecycle or the Docker

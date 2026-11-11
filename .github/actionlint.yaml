@@ -1,6 +1,0 @@
-# actionlint 1.7.12 does not know the code-quality permission yet; GitHub requires it to upload
-# coverage. Remove this entry when actionlint knows the scope.
-paths:
-  .github/workflows/coverage.yml:
-    ignore:
-      - 'unknown permission scope "code-quality"'

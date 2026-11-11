@@ -3,7 +3,7 @@
 /dist/
 /coverage.out
 /coverage.html
-/coverage.xml
+/coverage.txt
 
 # Local configuration and secrets
 .env
