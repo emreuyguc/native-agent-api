@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-11
+
+The first release with downloadable binaries and Docker images, a simpler Docker setup and an
+API document that lists every fixed value. A Docker installation of 0.1.0 needs the upgrade
+steps in `docker/README.md`.
+
 ### Added
 
 - Releases: a version tag publishes the binaries for linux and darwin (amd64, arm64) on GitHub and
@@ -26,6 +32,8 @@ All notable changes to this project are documented here. The format is based on
 
 ### Changed
 
+- Request fields with fixed values declare them as an `enum` in the API document. The gateway
+  already rejected other values, but a client generated from the document can change.
 - The API document groups operations by task (`login`, `ask`, `permissions`, `native control`
   are new groups) and names each one in a few words, such as "Start login". The former one-line
   summary starts the description. Operation IDs and paths are unchanged.
@@ -90,5 +98,6 @@ First public release.
   configuration.
 - Optional hardened Docker setup per agent, with resource limits and an egress-controlled variant.
 
-[Unreleased]: https://github.com/emreuyguc/native-agent-api/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/emreuyguc/native-agent-api/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/emreuyguc/native-agent-api/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/emreuyguc/native-agent-api/releases/tag/v0.1.0
