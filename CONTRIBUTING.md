@@ -20,7 +20,7 @@ writing rules are in [AGENTS.md](AGENTS.md); they apply to people and coding age
 4. Update the documentation that owns each fact, and add a line to `CHANGELOG.md` under
    `[Unreleased]` for a change users notice.
 5. Run `make check-pre-push` (or `make check-pre-commit` without Docker). It must pass clean.
-   `make hooks` makes git run them for you.
+   `make install-git-hooks` makes git run them for you.
 
 Changes to an adapter, the run lifecycle or the Docker setup also need the checks with the real
 CLI in [testing](docs/testing.md); say in the pull request which ones you ran.

@@ -3,17 +3,17 @@
 | Level | Command | Needs |
 |---|---|---|
 | Unit tests, lint, coverage, vulnerability scan | `make check-pre-commit` | Nothing else; runs in CI |
-| Fuzz tests with new inputs | `make fuzz FUZZTIME=1m` | Nothing else; runs in CI every week |
+| Fuzz tests with new inputs | `make test-fuzz FUZZTIME=1m` | Nothing else; runs in CI every week |
 | Real CLI tests | `make test-host AGENT=claude\|codex` | The CLI and its login; a few small model calls |
 | End-to-end checks | `scripts/acceptance.sh` | A login; starts or uses a gateway |
 | Docker image | `docker/verify.sh docker/<name>.env` | Docker with Compose v2 |
 
-`make test` runs each fuzz test only with its seeds and saved inputs. `make fuzz` searches for new
-inputs. When it finds a failing one, Go saves it under `testdata/fuzz/`; commit it with the fix, so
+`make test` runs each fuzz test only with its seeds and saved inputs. `make test-fuzz` searches
+for new inputs. When it finds a failing one, Go saves it under `testdata/fuzz/`; commit it with the fix, so
 it stays a regression test.
 
-`make coverage` fails when coverage falls below the limit in `.testcoverage.yml`. CI checks the
-same limit and writes the coverage to the run summary.
+`make check-coverage` fails when coverage falls below the limit in `.testcoverage.yml`. CI checks
+the same limit and writes the coverage to the run summary.
 
 [Development](development.md#checks) lists every check target. The other levels need the real
 CLIs, your login or Docker Compose, so CI cannot run them. Run them when a change touches an

@@ -34,7 +34,7 @@ jobs:
         if: ${{ !cancelled() && hashFiles('coverage.txt') != '' }}
         run: |
           { echo '```'; cat coverage.txt; echo '```'; } >>"$GITHUB_STEP_SUMMARY"
-      - run: make lint-shell
+      - run: make lint-scripts
 
   # zizmor finds unsafe patterns in the workflows: injection, token exposure, cache poisoning.
   workflows:
@@ -44,7 +44,7 @@ jobs:
         with:
           persist-credentials: false
       # The token lets zizmor look up actions with known vulnerabilities.
-      - run: make lint-zizmor ZIZMOR_ONLINE=1
+      - run: make audit-workflows ZIZMOR_ONLINE=1
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -72,6 +72,6 @@ jobs:
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Build ${{ matrix.image }} image (amd64 + arm64)
-        run: make images IMAGE="$IMAGE" PLATFORMS=linux/amd64,linux/arm64
+        run: make build-images IMAGE="$IMAGE" PLATFORMS=linux/amd64,linux/arm64
         env:
           IMAGE: ${{ matrix.image }}

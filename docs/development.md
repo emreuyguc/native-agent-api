@@ -8,7 +8,7 @@ make help
 make check-pre-commit
 make build
 make run
-make fmt
+make format-code
 ```
 
 `make run` builds and serves with `--env-file .env` (git-ignored; copy `.env.example`);
@@ -22,18 +22,19 @@ in CI, and the checks move with the repository to another CI service.
 
 | Target | When | What it runs | CI job |
 |---|---|---|---|
-| `make check-pre-commit` | Before a commit | `modules`, `lint`, `lint-workflows`, `coverage` (runs `test`), `vuln` | `ci` / `check` |
-| `make check-pre-push` | Before a push; needs Docker | `check-pre-commit`, then `lint-zizmor`, `lint-shell`, `api-diff`, `fuzz`, `images`, `snapshot` | All jobs below |
-| `make lint-zizmor` | | Workflow security (zizmor) | `ci` / `workflows` |
-| `make lint-shell` | | Shell scripts (ShellCheck) | `ci` / `check` |
-| `make api-diff BASE=…` | | API changes that break clients | `api` / `breaking-changes` |
-| `make fuzz FUZZTIME=…` | | New fuzz inputs; `check-pre-push` uses 10 seconds per target | `fuzz`, weekly with 2 minutes |
-| `make images` | | The Docker images, without pushing | `ci` / `docker` (amd64 and arm64) |
-| `make snapshot` | | The release archives and SBOMs in `dist/`, without publishing | `release` publishes them |
+| `make check-pre-commit` | Before a commit | `verify-modules`, `lint-go`, `lint-workflows`, `check-coverage` (runs `test`), `scan-vulnerabilities` | `ci` / `check` |
+| `make check-pre-push` | Before a push; needs Docker | `check-pre-commit`, then `audit-workflows`, `lint-scripts`, `check-api-compatibility`, `test-fuzz`, `build-images`, `build-release-snapshot` | All jobs below |
+| `make audit-workflows` | | Workflow security (zizmor) | `ci` / `workflows` |
+| `make lint-scripts` | | Shell scripts (ShellCheck) | `ci` / `check` |
+| `make check-api-compatibility BASE=…` | | API changes that break clients | `api` / `breaking-changes` |
+| `make test-fuzz FUZZTIME=…` | | New fuzz inputs; `check-pre-push` uses 10 seconds per target | `fuzz`, weekly with 2 minutes |
+| `make build-images` | | The Docker images, without pushing | `ci` / `docker` (amd64 and arm64) |
+| `make build-release-snapshot` | | The release archives and SBOMs in `dist/`, without publishing | `release` publishes them |
 
 `check-pre-push` compares the API with `origin/main`; pass `BASE=` for another base.
-`make hooks` makes git run `check-pre-commit` before each commit and `check-pre-push` before each
-push (`.githooks/`). Skip a hook once with `--no-verify`.
+`make install-git-hooks` makes git run `check-pre-commit` before each commit and `check-pre-push`
+before each push (`.githooks/`); `make uninstall-git-hooks` stops it. Skip a hook once with
+`--no-verify`.
 
 Only GitHub can run these: the dependency review, CodeQL, OpenSSF Scorecard, and the signed
 provenance and publishing of a release.
@@ -51,7 +52,7 @@ None of them changes the product's dependencies. Dependabot updates all of them.
 
 ## API compatibility
 
-`make api-diff BASE=origin/main` compares the generated OpenAPI document with the one of `BASE`.
+`make check-api-compatibility BASE=origin/main` compares the generated OpenAPI document with the one of `BASE`.
 It lists every change that can break an existing client, such as a removed field or a new
 `enum`. A pull request runs it against its base branch and fails on such a change. When the change
 is intended, add the `api-breaking` label to the pull request and describe the change in
