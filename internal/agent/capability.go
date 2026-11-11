@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"maps"
 	"slices"
 )
 
@@ -32,28 +33,34 @@ const (
 	CapabilityTools             Capability = "tools"
 )
 
-var knownCapabilities = []Capability{
-	CapabilityAuth,
-	CapabilityCustomAgents,
-	CapabilityDebugOutput,
-	CapabilityDiagnostics,
-	CapabilityFileCheckpointing,
-	CapabilityFileInputs,
-	CapabilityHooks,
-	CapabilityInteractive,
-	CapabilityMCP,
-	CapabilityModels,
-	CapabilityNativeControl,
-	CapabilityPartialMessages,
-	CapabilityPermissions,
-	CapabilityPlugins,
-	CapabilitySessionFork,
-	CapabilitySessions,
-	CapabilitySkills,
-	CapabilitySubscriptionUsage,
-	CapabilitySystemPromptState,
-	CapabilityTools,
+// capabilityMeanings describes each capability. The API document and docs/api.md list them.
+var capabilityMeanings = map[Capability]string{
+	CapabilityAuth:              "Native login, login status and logout through the API",
+	CapabilityCustomAgents:      "Subagents defined per run",
+	CapabilityDebugOutput:       "Native debug output on request",
+	CapabilityDiagnostics:       "GET /v1/agent/diagnostics",
+	CapabilityFileCheckpointing: "Native file checkpoints for workspace runs",
+	CapabilityFileInputs:        "Provider files downloaded into the workspace at run start",
+	CapabilityHooks:             "Native hooks",
+	CapabilityInteractive:       "Runs that accept further messages (POST /v1/runs)",
+	CapabilityMCP:               "MCP servers",
+	CapabilityModels:            "GET /v1/agent/models",
+	CapabilityNativeControl:     "Native control requests in both directions",
+	CapabilityPartialMessages:   "Partial output streamed as live chunks",
+	CapabilityPermissions:       "Tool permission requests (tools.permissions: ask)",
+	CapabilityPlugins:           "Native plugins",
+	CapabilitySessionFork:       "Forking a session",
+	CapabilitySessions:          "Persisted sessions that later runs continue",
+	CapabilitySkills:            "Native skills",
+	CapabilitySubscriptionUsage: "GET /v1/agent/usage",
+	CapabilitySystemPromptState: "Native system prompt snapshots",
+	CapabilityTools:             "Native tools in a workspace",
 }
+
+var knownCapabilities = slices.Sorted(maps.Keys(capabilityMeanings))
+
+// Meaning describes the capability, or returns "" for an unknown value.
+func (c Capability) Meaning() string { return capabilityMeanings[c] }
 
 // KnownCapabilities returns the complete provider-neutral capability vocabulary.
 func KnownCapabilities() []Capability { return slices.Clone(knownCapabilities) }

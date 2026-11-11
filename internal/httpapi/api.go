@@ -84,7 +84,8 @@ const wsDescription = "Server → client: Event objects as JSON text frames, the
 	"(codes as in the REST endpoints). Browsers must be same-origin.\n"
 
 // newAPI registers every operation on mux. The OpenAPI document is generated from the Go
-// types of the operations; it is never written by hand.
+// types of the operations; it is never written by hand. A registration's Summary is one sentence
+// about the operation; openapi_names.go gives each operation its group and short name.
 // The gateway sends an empty list rather than null, so no array schema is nullable.
 func init() { huma.DefaultArrayNullable = false } //nolint:gochecknoinits // Huma reads this global when schemas are generated.
 
@@ -102,7 +103,6 @@ func (s *Server) newAPI(mux *http.ServeMux) huma.API {
 		Description: "Token created with `" + buildinfo.Name + " new-token`; the gateway stores only its SHA-256.",
 	}}
 	cfg.Security = []map[string][]string{{"bearer": {}}}
-	cfg.Tags = []*huma.Tag{{Name: "system"}, {Name: "agent"}, {Name: "runs"}, {Name: "workspaces"}, {Name: "sessions"}, {Name: "files"}}
 	api := humago.New(mux, cfg)
 	providerComponents(api.OpenAPI().Components.Schemas, s.providerSections())
 
@@ -114,28 +114,28 @@ func (s *Server) newAPI(mux *http.ServeMux) huma.API {
 
 	// System and agent.
 	huma.Register(api, huma.Operation{
-		OperationID: "health", Method: http.MethodGet, Path: healthPath, Tags: []string{"system"},
+		OperationID: "health", Method: http.MethodGet, Path: healthPath,
 		Summary: "Liveness probe", Security: public,
 	}, s.health)
 	huma.Register(api, huma.Operation{
-		OperationID: "readiness", Method: http.MethodGet, Path: readyPath, Tags: []string{"system"},
+		OperationID: "readiness", Method: http.MethodGet, Path: readyPath,
 		Summary: "Readiness and component status", Security: public,
 		Responses: map[string]*huma.Response{"503": {Description: "One or more required components are unavailable."}},
 	}, s.readiness)
 	huma.Register(api, huma.Operation{
-		OperationID: "getAgent", Method: http.MethodGet, Path: "/v1/agent", Tags: []string{"agent"},
+		OperationID: "getAgent", Method: http.MethodGet, Path: "/v1/agent",
 		Summary: "The served agent, its CLI version and this gateway's build",
 	}, s.agentInfo)
 	huma.Register(api, huma.Operation{
-		OperationID: "getAgentDiagnostics", Method: http.MethodGet, Path: "/v1/agent/diagnostics", Tags: []string{"agent"},
+		OperationID: "getAgentDiagnostics", Method: http.MethodGet, Path: "/v1/agent/diagnostics",
 		Summary: "Bounded read-only diagnostics from the native CLI", Errors: []int{501, 502},
 	}, s.agentDiagnostics)
 	huma.Register(api, huma.Operation{
-		OperationID: "getAgentUsage", Method: http.MethodGet, Path: "/v1/agent/usage", Tags: []string{"agent"},
+		OperationID: "getAgentUsage", Method: http.MethodGet, Path: "/v1/agent/usage",
 		Summary: "Subscription usage (agents that support it)", Errors: []int{401, 403, 409, 501, 502},
 	}, s.agentUsage)
 	huma.Register(api, huma.Operation{
-		OperationID: "listAgentModels", Method: http.MethodGet, Path: "/v1/agent/models", Tags: []string{"agent"},
+		OperationID: "listAgentModels", Method: http.MethodGet, Path: "/v1/agent/models",
 		Summary: "Models reported by the native CLI, with the reasoning efforts each accepts", Errors: []int{401, 409, 501, 502},
 	}, s.agentModels)
 	s.registerAuth(api)
@@ -145,7 +145,7 @@ func (s *Server) newAPI(mux *http.ServeMux) huma.API {
 		"is cancelled. With `workspace_id` the agent works natively in the workspace and the answer's `session_id` can be " +
 		"continued; without it the model answers without tools in a private, throwaway directory and nothing is kept."
 	huma.Register(api, huma.Operation{
-		OperationID: "ask", Method: http.MethodPost, Path: "/v1/ask", Tags: []string{"runs"},
+		OperationID: "ask", Method: http.MethodPost, Path: "/v1/ask",
 		Summary: "Ask and wait for the answer", Description: askDescription + " `tools.permissions: ask` needs `/v1/ask/stream`.",
 		MaxBodyBytes: limit, Errors: []int{404, 409, 422, 429, 502, 504},
 		Responses: map[string]*huma.Response{"200": {
@@ -155,7 +155,7 @@ func (s *Server) newAPI(mux *http.ServeMux) huma.API {
 		}},
 	}, s.ask)
 	huma.Register(api, huma.Operation{
-		OperationID: "askStream", Method: http.MethodPost, Path: "/v1/ask/stream", Tags: []string{"runs"},
+		OperationID: "askStream", Method: http.MethodPost, Path: "/v1/ask/stream",
 		Summary: "Ask and stream the run's events", Description: askDescription + " The `X-Run-ID` header names the run, " +
 			"e.g. to answer permission requests.",
 		MaxBodyBytes: limit, Errors: []int{404, 409, 422, 429},
@@ -168,7 +168,7 @@ func (s *Server) newAPI(mux *http.ServeMux) huma.API {
 
 	// Runs.
 	huma.Register(api, huma.Operation{
-		OperationID: "startRun", Method: http.MethodPost, Path: "/v1/runs/start", Tags: []string{"runs"},
+		OperationID: "startRun", Method: http.MethodPost, Path: "/v1/runs/start",
 		Summary: "Start a new conversation in a workspace",
 		Description: "Creates a session (its `session_id` is in the response) and starts its first run. The run keeps going " +
 			"when the client disconnects, accepts further messages and ends when closed or idle. Continue later with " +
@@ -176,15 +176,15 @@ func (s *Server) newAPI(mux *http.ServeMux) huma.API {
 		DefaultStatus: http.StatusAccepted, MaxBodyBytes: limit, Errors: []int{404, 409, 422, 429},
 	}, s.createRun)
 	huma.Register(api, huma.Operation{
-		OperationID: "listRuns", Method: http.MethodGet, Path: "/v1/runs", Tags: []string{"runs"},
+		OperationID: "listRuns", Method: http.MethodGet, Path: "/v1/runs",
 		Summary: "Filter and page runs that are running or within retention, newest first", Errors: []int{422},
 	}, s.listRuns)
 	huma.Register(api, huma.Operation{
-		OperationID: "getRun", Method: http.MethodGet, Path: "/v1/runs/{run_id}", Tags: []string{"runs"},
+		OperationID: "getRun", Method: http.MethodGet, Path: "/v1/runs/{run_id}",
 		Summary: "Run status and result", Errors: []int{404},
 	}, s.getRun)
 	huma.Register(api, huma.Operation{
-		OperationID: "streamRunEvents", Method: http.MethodGet, Path: "/v1/runs/{run_id}/events", Tags: []string{"runs"},
+		OperationID: "streamRunEvents", Method: http.MethodGet, Path: "/v1/runs/{run_id}/events",
 		Summary: "Run events as Server-Sent Events",
 		Description: "Each event is `id: <seq>`, `event: <type>`, `data: <json>` (partial events have no id). A `: ping` comment " +
 			"is sent every 15 s. The stream ends after the terminal `done` or `error` event.",
@@ -192,18 +192,18 @@ func (s *Server) newAPI(mux *http.ServeMux) huma.API {
 		Responses: map[string]*huma.Response{"200": {Description: "Event stream.", Content: map[string]*huma.MediaType{"text/event-stream": eventStream}}},
 	}, s.runEvents)
 	huma.Register(api, huma.Operation{
-		OperationID: "runWebSocket", Method: http.MethodGet, Path: "/v1/runs/{run_id}/ws", Tags: []string{"runs"},
+		OperationID: "runWebSocket", Method: http.MethodGet, Path: "/v1/runs/{run_id}/ws",
 		Summary: "Run events and control over a WebSocket", Description: wsDescription, Errors: []int{400, 404},
 		Responses: map[string]*huma.Response{"101": {Description: "Switching to the WebSocket protocol."}},
 	}, s.runWebSocket)
 	huma.Register(api, huma.Operation{
-		OperationID: "sendMessage", Method: http.MethodPost, Path: "/v1/runs/{run_id}/message", Tags: []string{"runs"},
+		OperationID: "sendMessage", Method: http.MethodPost, Path: "/v1/runs/{run_id}/message",
 		Summary: "Send a message to the conversation", Description: "Queued if a turn is in progress; it then starts the next turn.",
 		DefaultStatus: http.StatusAccepted, MaxBodyBytes: limit, Errors: []int{404, 409, 422},
 	}, s.sendMessage)
 	runAction := func(id, path, summary, description string, handler func(*run.Run) error) {
 		huma.Register(api, huma.Operation{
-			OperationID: id, Method: http.MethodPost, Path: "/v1/runs/{run_id}/" + path, Tags: []string{"runs"},
+			OperationID: id, Method: http.MethodPost, Path: "/v1/runs/{run_id}/" + path,
 			Summary: summary, Description: description, DefaultStatus: http.StatusAccepted, Errors: []int{404, 409},
 		},
 			s.runAction(path, handler))
@@ -214,133 +214,113 @@ func (s *Server) newAPI(mux *http.ServeMux) huma.API {
 	runAction("cancelRun", "cancel", "Cancel a run", "Kills the agent process; the run ends with status `cancelled`.",
 		func(target *run.Run) error { target.Cancel(run.ErrCancelled); return nil })
 	huma.Register(api, huma.Operation{
-		OperationID: "allowPermission", Method: http.MethodPost, Path: "/v1/runs/{run_id}/permissions/{permission_id}/allow",
-		Tags: []string{"runs"}, Summary: "Allow a pending tool use",
+		OperationID: "allowPermission", Method: http.MethodPost, Path: "/v1/runs/{run_id}/permissions/{permission_id}/allow", Summary: "Allow a pending tool use",
 		DefaultStatus: http.StatusAccepted, MaxBodyBytes: limit, Errors: []int{404, 409, 422},
 	}, s.allowPermission)
 	huma.Register(api, huma.Operation{
-		OperationID: "denyPermission", Method: http.MethodPost, Path: "/v1/runs/{run_id}/permissions/{permission_id}/deny",
-		Tags: []string{"runs"}, Summary: "Deny a pending tool use",
+		OperationID: "denyPermission", Method: http.MethodPost, Path: "/v1/runs/{run_id}/permissions/{permission_id}/deny", Summary: "Deny a pending tool use",
 		DefaultStatus: http.StatusAccepted, MaxBodyBytes: limit, Errors: []int{404, 409, 422},
 	}, s.denyPermission)
 	huma.Register(api, huma.Operation{
-		OperationID: "sendNativeControl", Method: http.MethodPost, Path: "/v1/runs/{run_id}/native/control", Tags: []string{"runs"},
+		OperationID: "sendNativeControl", Method: http.MethodPost, Path: "/v1/runs/{run_id}/native/control",
 		Summary: "Send a native control request to the agent", Description: "The agent's response is returned as-is. See the agent's support matrix for subtypes.",
 		MaxBodyBytes: limit, Errors: []int{400, 404, 409, 422, 501, 504},
 	}, s.sendControl)
 	huma.Register(api, huma.Operation{
-		OperationID: "answerNativeControl", Method: http.MethodPost, Path: "/v1/runs/{run_id}/native/controls/{control_id}/answer",
-		Tags: []string{"runs"}, Summary: "Answer a control request sent by the agent",
+		OperationID: "answerNativeControl", Method: http.MethodPost, Path: "/v1/runs/{run_id}/native/controls/{control_id}/answer", Summary: "Answer a control request sent by the agent",
 		DefaultStatus: http.StatusAccepted, MaxBodyBytes: limit, Errors: []int{404, 409, 422},
 	}, s.respondControl)
 
 	// Sessions.
 	huma.Register(api, huma.Operation{
-		OperationID: "listSessions", Method: http.MethodGet, Path: "/v1/sessions",
-		Tags: []string{"sessions"}, Summary: "Filter and page gateway session metadata", Errors: []int{422},
+		OperationID: "listSessions", Method: http.MethodGet, Path: "/v1/sessions", Summary: "Filter and page gateway session metadata", Errors: []int{422},
 	}, s.listSessions)
 	huma.Register(api, huma.Operation{
-		OperationID: "getSession", Method: http.MethodGet, Path: "/v1/sessions/{session_id}",
-		Tags: []string{"sessions"}, Summary: "Get gateway session metadata and native transcript ownership", Errors: []int{404},
+		OperationID: "getSession", Method: http.MethodGet, Path: "/v1/sessions/{session_id}", Summary: "Get gateway session metadata and native transcript ownership", Errors: []int{404},
 	}, s.getSession)
 	huma.Register(api, huma.Operation{
-		OperationID: "continueSession", Method: http.MethodPost, Path: "/v1/sessions/{session_id}/continue",
-		Tags: []string{"sessions"}, Summary: "Continue a conversation",
+		OperationID: "continueSession", Method: http.MethodPost, Path: "/v1/sessions/{session_id}/continue", Summary: "Continue a conversation",
 		Description: "Starts the session's next run. Only `prompt` is required: the session's settings are reused; a " +
 			"supplied field replaces the remembered one (an `options` object replaces the previous one as a whole).",
 		DefaultStatus: http.StatusAccepted, MaxBodyBytes: limit, Errors: []int{404, 409, 422, 429},
 	}, s.continueSession)
 	huma.Register(api, huma.Operation{
-		OperationID: "forkSession", Method: http.MethodPost, Path: "/v1/sessions/{session_id}/fork",
-		Tags: []string{"sessions"}, Summary: "Fork a conversation into a new session",
+		OperationID: "forkSession", Method: http.MethodPost, Path: "/v1/sessions/{session_id}/fork", Summary: "Fork a conversation into a new session",
 		Description:   "Returns the new session with the parent's settings. Its first continue forks the native conversation.",
 		DefaultStatus: http.StatusCreated, Errors: []int{404, 409},
 	}, s.forkSession)
 	huma.Register(api, huma.Operation{
-		OperationID: "deleteSession", Method: http.MethodPost, Path: "/v1/sessions/{session_id}/delete",
-		Tags: []string{"sessions"}, Summary: "Delete gateway session metadata",
+		OperationID: "deleteSession", Method: http.MethodPost, Path: "/v1/sessions/{session_id}/delete", Summary: "Delete gateway session metadata",
 		Description:   "The native CLI keeps its own transcript; the gateway never deletes it. An active session returns 409.",
 		DefaultStatus: http.StatusNoContent, Errors: []int{404, 409},
 	}, s.deleteSession)
 
 	// Workspaces.
 	huma.Register(api, huma.Operation{
-		OperationID: "listWorkspaces", Method: http.MethodGet, Path: "/v1/workspaces", Tags: []string{"workspaces"},
+		OperationID: "listWorkspaces", Method: http.MethodGet, Path: "/v1/workspaces",
 		Summary: "List managed and attached workspaces", Errors: []int{422},
 	}, s.listWorkspaces)
 	huma.Register(api, huma.Operation{
-		OperationID: "createWorkspace", Method: http.MethodPost, Path: "/v1/workspaces/create", Tags: []string{"workspaces"},
+		OperationID: "createWorkspace", Method: http.MethodPost, Path: "/v1/workspaces/create",
 		Summary: "Create an empty managed workspace", DefaultStatus: http.StatusCreated,
 	}, s.createWorkspace)
 	huma.Register(api, huma.Operation{
-		OperationID: "attachWorkspace", Method: http.MethodPost, Path: "/v1/workspaces/attach", Tags: []string{"workspaces"},
+		OperationID: "attachWorkspace", Method: http.MethodPost, Path: "/v1/workspaces/attach",
 		Summary:       "Attach an existing directory as a workspace",
 		Description:   "The directory must be inside `NATIVE_AGENT_ALLOWED_ROOTS`. Attaching the same directory again returns the existing workspace.",
 		DefaultStatus: http.StatusCreated, MaxBodyBytes: 8 << 10, Errors: []int{403, 422},
 	}, s.attachWorkspace)
 	huma.Register(api, huma.Operation{
-		OperationID: "getWorkspace", Method: http.MethodGet, Path: "/v1/workspaces/{workspace_id}",
-		Tags: []string{"workspaces"}, Summary: "Describe a workspace", Errors: []int{404},
+		OperationID: "getWorkspace", Method: http.MethodGet, Path: "/v1/workspaces/{workspace_id}", Summary: "Describe a workspace", Errors: []int{404},
 	}, s.getWorkspace)
 	huma.Register(api, huma.Operation{
-		OperationID: "deleteWorkspace", Method: http.MethodPost, Path: "/v1/workspaces/{workspace_id}/delete",
-		Tags: []string{"workspaces"}, Summary: "Delete a managed workspace and its files",
+		OperationID: "deleteWorkspace", Method: http.MethodPost, Path: "/v1/workspaces/{workspace_id}/delete", Summary: "Delete a managed workspace and its files",
 		Description:   "Attached directories are detached instead (409 `wrong_workspace_storage`).",
 		DefaultStatus: http.StatusNoContent, Errors: []int{404, 409},
 	}, s.removeWorkspace("managed", "deleted"))
 	huma.Register(api, huma.Operation{
-		OperationID: "detachWorkspace", Method: http.MethodPost, Path: "/v1/workspaces/{workspace_id}/detach",
-		Tags: []string{"workspaces"}, Summary: "Detach an attached directory; its files stay untouched",
+		OperationID: "detachWorkspace", Method: http.MethodPost, Path: "/v1/workspaces/{workspace_id}/detach", Summary: "Detach an attached directory; its files stay untouched",
 		DefaultStatus: http.StatusNoContent, Errors: []int{404, 409},
 	}, s.removeWorkspace("attachment", "detached"))
 	huma.Register(api, huma.Operation{
-		OperationID: "listPermissionRules", Method: http.MethodGet, Path: "/v1/workspaces/{workspace_id}/permissions",
-		Tags: []string{"workspaces"}, Summary: "Tools allowed for the workspace or its sessions", Errors: []int{404},
+		OperationID: "listPermissionRules", Method: http.MethodGet, Path: "/v1/workspaces/{workspace_id}/permissions", Summary: "Tools allowed for the workspace or its sessions", Errors: []int{404},
 	}, s.listPermissionRules)
 	huma.Register(api, huma.Operation{
-		OperationID: "clearPermissionRules", Method: http.MethodPost, Path: "/v1/workspaces/{workspace_id}/permissions/clear",
-		Tags: []string{"workspaces"}, Summary: "Revoke all session and workspace rules",
+		OperationID: "clearPermissionRules", Method: http.MethodPost, Path: "/v1/workspaces/{workspace_id}/permissions/clear", Summary: "Revoke all session and workspace rules",
 		DefaultStatus: http.StatusNoContent, Errors: []int{404},
 	}, s.clearPermissionRules)
 
 	// Files.
 	files := "/v1/workspaces/{workspace_id}/files"
 	huma.Register(api, huma.Operation{
-		OperationID: "listFiles", Method: http.MethodGet, Path: files,
-		Tags: []string{"files"}, Summary: "Page files and directories (symbolic links are skipped)", Errors: []int{404, 422},
+		OperationID: "listFiles", Method: http.MethodGet, Path: files, Summary: "Page files and directories (symbolic links are skipped)", Errors: []int{404, 422},
 	}, s.listFiles)
 	huma.Register(api, huma.Operation{
-		OperationID: "downloadFile", Method: http.MethodGet, Path: files + "/download/{path...}",
-		Tags: []string{"files"}, Summary: "Download a file (supports Range and conditional requests)", Errors: []int{404, 422},
+		OperationID: "downloadFile", Method: http.MethodGet, Path: files + "/download/{path...}", Summary: "Download a file (supports Range and conditional requests)", Errors: []int{404, 422},
 		Responses: map[string]*huma.Response{
 			"200": {Description: "File content.", Content: map[string]*huma.MediaType{"application/octet-stream": binary}},
 			"206": {Description: "Requested range.", Content: map[string]*huma.MediaType{"application/octet-stream": binary}},
 		},
 	}, s.downloadFile)
 	huma.Register(api, huma.Operation{
-		OperationID: "uploadFile", Method: http.MethodPost, Path: files + "/upload/{path...}",
-		Tags: []string{"files"}, Summary: "Upload a file (streamed, atomic replace)", Description: "The body is stored as-is; Content-Type is not interpreted. The parent directory must exist.",
+		OperationID: "uploadFile", Method: http.MethodPost, Path: files + "/upload/{path...}", Summary: "Upload a file (streamed, atomic replace)", Description: "The body is stored as-is; Content-Type is not interpreted. The parent directory must exist.",
 		DefaultStatus: http.StatusCreated, Errors: []int{404, 413, 422},
 		RequestBody: &huma.RequestBody{Required: true, Content: map[string]*huma.MediaType{"application/octet-stream": binary}},
 	}, s.uploadFile)
 	huma.Register(api, huma.Operation{
-		OperationID: "deleteFile", Method: http.MethodPost, Path: files + "/delete",
-		Tags: []string{"files"}, Summary: "Delete a file or directory tree",
+		OperationID: "deleteFile", Method: http.MethodPost, Path: files + "/delete", Summary: "Delete a file or directory tree",
 		DefaultStatus: http.StatusNoContent, MaxBodyBytes: 8 << 10, Errors: []int{404, 422},
 	}, s.deleteFile)
 	huma.Register(api, huma.Operation{
-		OperationID: "makeDirectory", Method: http.MethodPost, Path: files + "/mkdir",
-		Tags: []string{"files"}, Summary: "Create a directory",
+		OperationID: "makeDirectory", Method: http.MethodPost, Path: files + "/mkdir", Summary: "Create a directory",
 		DefaultStatus: http.StatusCreated, MaxBodyBytes: 8 << 10, Errors: []int{404, 409, 422},
 	}, s.makeDirectory)
 	huma.Register(api, huma.Operation{
-		OperationID: "copyFile", Method: http.MethodPost, Path: files + "/copy",
-		Tags: []string{"files"}, Summary: "Copy a file or directory tree",
+		OperationID: "copyFile", Method: http.MethodPost, Path: files + "/copy", Summary: "Copy a file or directory tree",
 		DefaultStatus: http.StatusCreated, MaxBodyBytes: 8 << 10, Errors: []int{404, 409, 413, 422},
 	}, s.transfer("copied", s.workspaces.Copy))
 	huma.Register(api, huma.Operation{
-		OperationID: "moveFile", Method: http.MethodPost, Path: files + "/move",
-		Tags: []string{"files"}, Summary: "Move or rename a file or directory tree",
+		OperationID: "moveFile", Method: http.MethodPost, Path: files + "/move", Summary: "Move or rename a file or directory tree",
 		DefaultStatus: http.StatusCreated, MaxBodyBytes: 8 << 10, Errors: []int{404, 409, 422},
 	}, s.transfer("moved", s.workspaces.Move))
 
@@ -351,6 +331,9 @@ func (s *Server) newAPI(mux *http.ServeMux) huma.API {
 			api.OpenAPI().Paths[fixed] = item
 		}
 	}
+	nameOperations(api.OpenAPI())
+	s.documentValues(api.OpenAPI().Components.Schemas)
+	documentExamples(api.OpenAPI())
 
 	return api
 }

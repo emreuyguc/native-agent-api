@@ -100,30 +100,30 @@ type submitCodeInput struct {
 
 func (s *Server) registerAuth(api huma.API) {
 	huma.Register(api, huma.Operation{
-		OperationID: "getLoginStatus", Method: http.MethodGet, Path: "/v1/agent/status", Tags: []string{"agent"},
+		OperationID: "getLoginStatus", Method: http.MethodGet, Path: "/v1/agent/status",
 		Summary: "Whether the CLI is logged in, with its own status document", Errors: []int{401, 409, 502},
 	}, s.agentAuthStatus)
 	huma.Register(api, huma.Operation{
-		OperationID: "startLogin", Method: http.MethodPost, Path: "/v1/agent/login/start", Tags: []string{"agent"},
+		OperationID: "startLogin", Method: http.MethodPost, Path: "/v1/agent/login/start",
 		Summary:       "Start the native login flow",
 		Description:   "Runs the CLI's own login. Open `step.url` in any browser; with `flow: paste_code`, submit the code the page shows; with `device_code`, enter `step.user_code` on the page. Only one login runs at a time.",
 		DefaultStatus: http.StatusCreated, MaxBodyBytes: 8 << 10, Errors: []int{409, 422, 501, 502},
 	}, s.startLogin)
 	huma.Register(api, huma.Operation{
-		OperationID: "getLogin", Method: http.MethodGet, Path: "/v1/agent/login", Tags: []string{"agent"},
+		OperationID: "getLogin", Method: http.MethodGet, Path: "/v1/agent/login",
 		Summary: "Progress of the current or latest login", Errors: []int{404},
 	}, s.getLogin)
 	huma.Register(api, huma.Operation{
-		OperationID: "submitLoginCode", Method: http.MethodPost, Path: "/v1/agent/login/code", Tags: []string{"agent"},
+		OperationID: "submitLoginCode", Method: http.MethodPost, Path: "/v1/agent/login/code",
 		Summary: "Submit the code shown by the sign-in page", DefaultStatus: http.StatusAccepted,
 		MaxBodyBytes: 8 << 10, Errors: []int{404, 409, 422},
 	}, s.submitLoginCode)
 	huma.Register(api, huma.Operation{
-		OperationID: "cancelLogin", Method: http.MethodPost, Path: "/v1/agent/login/cancel", Tags: []string{"agent"},
+		OperationID: "cancelLogin", Method: http.MethodPost, Path: "/v1/agent/login/cancel",
 		Summary: "Cancel the pending login", Errors: []int{404},
 	}, s.cancelLogin)
 	huma.Register(api, huma.Operation{
-		OperationID: "logout", Method: http.MethodPost, Path: "/v1/agent/logout", Tags: []string{"agent"},
+		OperationID: "logout", Method: http.MethodPost, Path: "/v1/agent/logout",
 		Summary: "Remove the native CLI credentials", DefaultStatus: http.StatusNoContent, Errors: []int{409, 501, 502},
 	}, s.logout)
 }
@@ -134,18 +134,18 @@ func (s *Server) startLogin(ctx context.Context, in *startLoginInput) (*body[log
 		return nil, agentError(agent.ErrUnsupported)
 	}
 	if in.Body == nil || !slices.Contains(s.agent.Info().LoginMethods, in.Body.Method) {
-		return nil, fail(http.StatusUnprocessableEntity, "invalid_request", "method must be one of the agent's login.methods")
+		return nil, fail(http.StatusUnprocessableEntity, codeInvalidRequest, "method must be one of the agent's login.methods")
 	}
 	options, err := agent.SplitProvider(json.RawMessage(in.Body.Provider), "provider", s.agent.Name())
 	if err != nil {
 		return nil, agentError(err)
 	}
 	if !s.logins.starting.TryLock() {
-		return nil, fail(http.StatusConflict, "login_in_progress", "Another login is starting.")
+		return nil, fail(http.StatusConflict, codeLoginInProgress, "Another login is starting.")
 	}
 	defer s.logins.starting.Unlock()
 	if s.loginPending() {
-		return nil, fail(http.StatusConflict, "login_in_progress", "Another login is pending; cancel it or wait for it to finish.")
+		return nil, fail(http.StatusConflict, codeLoginInProgress, "Another login is pending; cancel it or wait for it to finish.")
 	}
 	created := time.Now().UTC()
 	// The login outlives this request: it is bounded by the server lifetime and LoginTimeout.
@@ -205,7 +205,7 @@ func (s *Server) lookupLogin() (*loginEntry, error) {
 		return current, nil
 	}
 
-	return nil, fail(http.StatusNotFound, "login_not_found", "No login has been started.")
+	return nil, fail(http.StatusNotFound, codeLoginNotFound, "No login has been started.")
 }
 
 func (s *Server) getLogin(context.Context, *struct{}) (*body[loginView], error) {
@@ -221,7 +221,7 @@ func (s *Server) getLogin(context.Context, *struct{}) (*body[loginView], error) 
 
 func (s *Server) submitLoginCode(_ context.Context, in *submitCodeInput) (*body[loginView], error) {
 	if in.Body == nil {
-		return nil, fail(http.StatusUnprocessableEntity, "invalid_request", "code is required")
+		return nil, fail(http.StatusUnprocessableEntity, codeInvalidRequest, "code is required")
 	}
 	s.logins.mu.Lock()
 	defer s.logins.mu.Unlock()
@@ -230,7 +230,7 @@ func (s *Server) submitLoginCode(_ context.Context, in *submitCodeInput) (*body[
 		return nil, err
 	}
 	if entry.view.Status != loginPending {
-		return nil, fail(http.StatusConflict, "login_finished", "The login has already finished.")
+		return nil, fail(http.StatusConflict, codeLoginFinished, "The login has already finished.")
 	}
 	if err := entry.login.SubmitCode(in.Body.Code); err != nil {
 		return nil, agentError(err)
@@ -267,11 +267,11 @@ func (s *Server) logout(ctx context.Context, _ *struct{}) (*struct{}, error) {
 		return nil, agentError(agent.ErrUnsupported)
 	}
 	if !s.logins.starting.TryLock() {
-		return nil, fail(http.StatusConflict, "login_in_progress", "A login is starting.")
+		return nil, fail(http.StatusConflict, codeLoginInProgress, "A login is starting.")
 	}
 	defer s.logins.starting.Unlock()
 	if s.loginPending() {
-		return nil, fail(http.StatusConflict, "login_in_progress", "Cancel the pending login before logging out.")
+		return nil, fail(http.StatusConflict, codeLoginInProgress, "Cancel the pending login before logging out.")
 	}
 	if err := authenticator.Logout(ctx); err != nil {
 		return nil, agentError(err)

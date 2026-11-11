@@ -291,13 +291,6 @@ type loginAgent struct {
 	loggedOut chan struct{}
 }
 
-func (a *loginAgent) Info() agent.Info {
-	info := a.Agent.Info()
-	info.LoginMethods = []string{"browser"}
-
-	return info
-}
-
 func (*loginAgent) StartLogin(ctx context.Context, _ agent.LoginRequest) (agent.Login, error) {
 	login := &fakeLogin{code: make(chan string, 1), done: make(chan error, 1)}
 	go func() {

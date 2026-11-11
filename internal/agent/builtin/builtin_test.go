@@ -67,6 +67,14 @@ func TestCatalogIsDocumented(t *testing.T) {
 				t.Errorf("%s: unknown capability %q", info.Name, capability)
 			}
 		}
+		// The image installs the CLI release the adapter is tested against.
+		dockerfile, err := os.ReadFile("../../../docker/" + info.Name + "/Dockerfile")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if pin := "cli_version=" + info.TestedVersion + ";"; !strings.Contains(string(dockerfile), pin) {
+			t.Errorf("%s: docker/%s/Dockerfile does not install the tested version; want %q", info.Name, info.Name, pin)
+		}
 		row := "| `" + info.Name + "` | " + info.Title + " | [Support details](" + info.Docs + ") |"
 		if !strings.Contains(string(readme), row) {
 			t.Errorf("%s: README support row is missing or stale; want %q", info.Name, row)

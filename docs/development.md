@@ -1,6 +1,6 @@
 # Development
 
-Requirements: Go 1.27.3+, golangci-lint 2.15, and Docker for the container images.
+Requirements: Go 1.27.4+, golangci-lint 2.15, and Docker for the container images.
 
 ```sh
 make help
@@ -29,6 +29,7 @@ internal/workspace/     workspaces, host-directory attachments, and file operati
 internal/permission/    in-memory permission rules
 internal/fsroot/        allowed-root policy
 docker/                optional container images and Compose definitions
+scripts/               interactive setup and the end-to-end acceptance runner
 ```
 
 A new adapter goes in `internal/agent/<name>`, is registered in `internal/agent/builtin`, and gets

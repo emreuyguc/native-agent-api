@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 )
 
 // Provider is the provider section of an API object: {"name": "<agent>", the fields only that
@@ -187,4 +188,16 @@ func DecodeStrict(raw json.RawMessage, field string, target any) error {
 	}
 
 	return nil
+}
+
+// EnumOf returns the values in the `enum` tag of field in struct T. Adapters validate a provider
+// option with it, so the API document and the validation share one list.
+func EnumOf[T any](field string) []string {
+	f, ok := reflect.TypeFor[T]().FieldByName(field)
+	values := f.Tag.Get("enum")
+	if !ok || values == "" {
+		panic("agent: " + reflect.TypeFor[T]().String() + "." + field + " has no enum tag")
+	}
+
+	return strings.Split(values, ",")
 }

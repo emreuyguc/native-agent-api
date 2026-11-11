@@ -11,7 +11,7 @@ import (
 )
 
 type healthStatus struct {
-	Status string `json:"status" example:"ok"`
+	Status string `json:"status" enum:"ok"`
 }
 
 func (s *Server) health(context.Context, *struct{}) (*body[healthStatus], error) {
@@ -190,22 +190,22 @@ func agentError(err error) error {
 	return fail(status, code, message)
 }
 
-func agentErrorInfo(err error) (status int, code, message string) {
+func agentErrorInfo(err error) (status int, code errorCode, message string) {
 	var mismatch *agent.ProviderMismatchError
 	switch {
 	case errors.As(err, &mismatch):
-		return http.StatusUnprocessableEntity, "provider_mismatch", err.Error()
+		return http.StatusUnprocessableEntity, codeProviderMismatch, err.Error()
 	case errors.Is(err, agent.ErrInvalidRequest):
-		return http.StatusUnprocessableEntity, "invalid_request", strings.TrimPrefix(err.Error(), agent.ErrInvalidRequest.Error()+": ")
+		return http.StatusUnprocessableEntity, codeInvalidRequest, strings.TrimPrefix(err.Error(), agent.ErrInvalidRequest.Error()+": ")
 	case errors.Is(err, agent.ErrLoginRequired):
-		return http.StatusConflict, "login_required", err.Error()
+		return http.StatusConflict, codeLoginRequired, err.Error()
 	case errors.Is(err, agent.ErrLoginExpired):
-		return http.StatusUnauthorized, "login_expired", err.Error()
+		return http.StatusUnauthorized, codeLoginExpired, err.Error()
 	case errors.Is(err, agent.ErrForbidden):
-		return http.StatusForbidden, "forbidden", err.Error()
+		return http.StatusForbidden, codeForbidden, err.Error()
 	case errors.Is(err, agent.ErrUnsupported):
-		return http.StatusNotImplemented, "unsupported", err.Error()
+		return http.StatusNotImplemented, codeUnsupported, err.Error()
 	default:
-		return http.StatusBadGateway, "agent_failed", err.Error()
+		return http.StatusBadGateway, codeAgentFailed, err.Error()
 	}
 }

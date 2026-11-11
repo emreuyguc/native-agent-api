@@ -5,7 +5,7 @@
 | Unit tests, lint, vulnerability scan | `make check` | Nothing else; runs in CI |
 | Real CLI tests | `make test-host AGENT=claude\|codex` | The CLI and its login; a few small model calls |
 | End-to-end checks | `scripts/acceptance.sh` | A login; starts or uses a gateway |
-| Docker image | `docker/verify.sh claude\|codex [--egress]` | Docker with Compose v2 |
+| Docker image | `docker/verify.sh docker/<name>.env` | Docker with Compose v2 |
 
 Run `make check` before every pull request. The other levels use the real CLIs and your login, so
 CI cannot run them; run them when a change touches an adapter, the run lifecycle or the Docker
@@ -239,32 +239,20 @@ file is not created and the agent says the call was declined. Close the run with
 builds and checks the image, starts the container, logs in, runs sections 2–9 against it and then
 10.3–10.5. By hand:
 
-In a container these app settings are fixed, not choices:
-
-| Setting | Value | Why |
-|---|---|---|
-| `NATIVE_AGENT_SANDBOX_MODE` | `external` | The container is the isolation boundary; bubblewrap cannot create namespaces in it |
-| `NATIVE_AGENT_PROFILE_DIR` | `native` | `HOME` (`/home/runner`) is a named volume, so the native profile and its login persist |
-| `NATIVE_AGENT_LISTEN` | `0.0.0.0:8080` | The published port reaches the container interface, never its loopback |
-| `NATIVE_AGENT_DATA_DIR` | `/data` | Named volume |
-| `NATIVE_AGENT_ALLOWED_ROOTS` | `/projects` | Named volume for attachable projects |
-
-Log in inside the container through the API. Host credentials are not mounted: Claude keeps them in
-the macOS Keychain, and a shared Codex `auth.json` makes the host and the container rotate the same
-refresh token, which signs one of them out.
+Set up the installation as in [docker/README.md](../docker/README.md#setup). Log in inside the container through the API. Host credentials are not mounted:
+Claude keeps them in the macOS Keychain, and a shared Codex `auth.json` makes the host and the
+container rotate the same refresh token, which signs one of them out.
 
 ```sh
-cp docker/.env.example docker/.env           # set BUILD_* and CLAUDE_APP_ENV_FILE
-cp .env.example /abs/path/native-agent-api.claude.env     # the fixed values above + TOKEN_SHA256
-docker/verify.sh claude                        # 10.1 Expected: OK: claude docker
-C="docker compose --env-file docker/.env -f docker/compose.yaml -f docker/compose.claude.yaml --profile claude"
+docker/verify.sh docker/claude.env               # 10.1 Expected: OK: native-agent-api-claude
+C="docker compose --env-file docker/claude.env"
 $C up -d --wait
 export U=http://127.0.0.1:8701
 api -X POST $U/v1/agent/login/start -d '{"method":"claudeai"}' | jq .      # 10.2
 # Open the URL, sign in, then: api -X POST $U/v1/agent/login/code -d '{"code":"<code from the page>"}'
 ```
 
-For codex use `compose.codex.yaml`, port `8702` and `{"method":"chatgpt_device_code"}` (open `step.url`,
+For codex use `docker/codex.env`, port `8702` and `{"method":"chatgpt_device_code"}` (open `step.url`,
 enter `step.user_code`).
 
 Then run sections 2–9 against the container port. Checks that need the host filesystem or process
@@ -272,10 +260,10 @@ table do not apply. In a container the agent can reach the gateway on its loopba
 without the token (8.5), and Codex has nothing to escalate, so section 6 does not ask with Codex.
 
 - 10.3 `$C restart` keeps the login, workspaces and sessions (named volumes).
-- 10.4 Restricted egress: `docker/verify.sh claude --egress` prints OK; with
-  `-f docker/compose.claude.egress.yaml` added to `$C`, an ask still works, while asking the agent to
-  fetch `https://example.com` fails and `docker logs native-agent-api-claude-egress-1` shows
-  `refused on filtered domain`.
+- 10.4 Restricted egress: with `COMPOSE_FILE=docker/compose.yaml:docker/compose.egress.yaml` in
+  the Docker env file, `docker/verify.sh docker/claude.env` prints `OK: native-agent-api-claude
+  (restricted egress)`. After `$C up -d`, an ask still works, while asking the agent to fetch
+  `https://example.com` fails and `$C logs egress` shows `refused on filtered domain`.
 - 10.5 Cleanup: `$C down` keeps the volumes; `$C down -v` deletes them, including the login.
 
 ## 11. Cleanup (host)

@@ -1,44 +1,52 @@
 # syntax=docker/dockerfile:1.7
 
-ARG GO_IMAGE
-ARG RUNTIME_IMAGE
-
-FROM --platform=$BUILDPLATFORM ${GO_IMAGE} AS gateway-build
-ARG TARGETOS TARGETARCH VERSION COMMIT DATE
+FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine3.24@sha256:0a5f7fe796599ff487605987432e7619ae45beeb2fba4c2ce0b907879932aebf AS gateway-build
+ARG TARGETOS TARGETARCH
 WORKDIR /src
-RUN test -n "$VERSION" && test -n "$COMMIT" && test -n "$DATE"
+SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
+# git reads the build identity from the checkout, like `make build`. The package comes from the
+# pinned Alpine release branch.
+# hadolint ignore=DL3018
+RUN apk add --no-cache git
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY cmd ./cmd
 COPY internal ./internal
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath \
+# The version is the nearest tag and commit; -dirty marks uncommitted changes in the built sources.
+RUN --mount=type=bind,source=.git,target=.git \
+    --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
+    export GIT_OPTIONAL_LOCKS=0; \
+    git config --global --add safe.directory /src; \
+    version=$(git describe --tags --always); \
+    if [ -n "$(git status --porcelain -- go.mod go.sum cmd internal)" ]; then version="$version-dirty"; fi; \
+    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -buildvcs=false \
       -ldflags="-s -w \
-        -X github.com/emreuyguc/native-agent-api/internal/buildinfo.Version=${VERSION} \
-        -X github.com/emreuyguc/native-agent-api/internal/buildinfo.Commit=${COMMIT} \
-        -X github.com/emreuyguc/native-agent-api/internal/buildinfo.Date=${DATE}" \
+        -X github.com/emreuyguc/native-agent-api/internal/buildinfo.Version=${version} \
+        -X github.com/emreuyguc/native-agent-api/internal/buildinfo.Commit=$(git rev-parse HEAD) \
+        -X github.com/emreuyguc/native-agent-api/internal/buildinfo.Date=$(git show -s --format=%cI HEAD)" \
       -o /out/native-agent-api ./cmd/native-agent-api
 
-FROM ${RUNTIME_IMAGE} AS codex-download
+FROM alpine:3.24.3@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS codex-download
 ARG TARGETARCH
 WORKDIR /download
 SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
-COPY docker/codex/release.env ./
+# The Codex CLI release the adapter is tested against, with the SHA-256 of each platform's
+# package. Update all three together with the version in internal/agent/codex.
 RUN set -eu; \
-    . ./release.env; \
+    cli_version=0.167.0; \
     case "$TARGETARCH" in \
-        arm64) platform="aarch64-unknown-linux-musl"; checksum="$CODEX_PACKAGE_SHA256_ARM64" ;; \
-        amd64) platform="x86_64-unknown-linux-musl"; checksum="$CODEX_PACKAGE_SHA256_AMD64" ;; \
+        arm64) platform="aarch64-unknown-linux-musl"; checksum=0de261ecf1e7f3028a7952f03fca2093f749277d38590b78bb32f8567756bbb7 ;; \
+        amd64) platform="x86_64-unknown-linux-musl"; checksum=3bbf75e83de6b58aed28f2cf6e33ad423ec31fd4700a1457b94be557ea5a7c6e ;; \
         *) echo "unsupported architecture: $TARGETARCH" >&2; exit 1 ;; \
     esac; \
     archive="codex-package-${platform}.tar.gz"; \
-    wget -q "${CODEX_RELEASE_BASE_URL}/rust-v${CODEX_VERSION}/${archive}" -O codex.tar.gz; \
+    wget -q "https://github.com/openai/codex/releases/download/rust-v${cli_version}/${archive}" -O codex.tar.gz; \
     echo "${checksum}  codex.tar.gz" | sha256sum -c -; \
     mkdir package; \
     tar -xzf codex.tar.gz -C package; \
     test -x package/bin/codex
 
-FROM ${RUNTIME_IMAGE}
+FROM alpine:3.24.3@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
 LABEL org.opencontainers.image.title="native-agent-api-codex" \
       org.opencontainers.image.description="native-agent-api with the native Codex CLI package"
 # bash: Claude Code's Bash tool accepts only bash or zsh, and Codex prefers bash over sh.

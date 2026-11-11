@@ -18,8 +18,8 @@ const (
 )
 
 var (
-	ReasoningSummaries = []string{"auto", "concise", "detailed", "none"}
-	ApprovalsReviewers = []string{"user", "auto_review"}
+	ReasoningSummaries = agent.EnumOf[RequestOptions]("ReasoningSummary")
+	ApprovalsReviewers = agent.EnumOf[RequestOptions]("ApprovalsReviewer")
 
 	optionNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,255}$`)
 )
@@ -39,16 +39,16 @@ var gatewayConfigKeys = []string{
 // object). See docs/agents/codex-cli.md.
 type RequestOptions struct {
 	// Config holds native config overrides (mcp_servers, features, tools, web_search, ...).
-	Config                map[string]any `json:"config,omitempty"`
-	DeveloperInstructions string         `json:"developer_instructions,omitempty"`
-	ApprovalsReviewer     string         `json:"approvals_reviewer,omitempty"`
-	ServiceTier           string         `json:"service_tier,omitempty"`
-	ReasoningSummary      string         `json:"reasoning_summary,omitempty"`
+	Config                map[string]any `json:"config,omitempty" doc:"Thread config overrides (mcp_servers, features, tools, web_search, hooks). Keys the gateway owns are rejected."`
+	DeveloperInstructions string         `json:"developer_instructions,omitempty" doc:"Thread developerInstructions."`
+	ApprovalsReviewer     string         `json:"approvals_reviewer,omitempty" enum:"user,auto_review" doc:"Thread approvalsReviewer; needs tools.permissions ask."`
+	ServiceTier           string         `json:"service_tier,omitempty" doc:"Thread serviceTier."`
+	ReasoningSummary      string         `json:"reasoning_summary,omitempty" enum:"auto,concise,detailed,none" doc:"Turn summary."`
 	// DisabledPluginIDs replaces the thread's disabled plugins; an empty list clears it.
-	DisabledPluginIDs *[]string `json:"disabled_plugin_ids,omitempty"`
+	DisabledPluginIDs *[]string `json:"disabled_plugin_ids,omitempty" doc:"Turn disabledPluginIds; an empty list clears it."`
 	// SkillRoots add skill directories inside an allowed root or the workspace. They live in
 	// the run's own app-server process and are never written to the Codex config.
-	SkillRoots []string `json:"skill_roots,omitempty"`
+	SkillRoots []string `json:"skill_roots,omitempty" doc:"Extra skill directories inside an allowed root or the workspace."`
 }
 
 // ParseOptions decodes and validates raw options for req.

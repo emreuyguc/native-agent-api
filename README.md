@@ -87,7 +87,16 @@ sequenceDiagram
 | `claude` | Claude Code | [Support details](docs/agents/claude-code.md) |
 | `codex` | Codex CLI | [Support details](docs/agents/codex-cli.md) |
 
-One gateway process serves one agent. Run two processes to serve both.
+One gateway process serves one agent. Run two processes to serve both. Each has its own login,
+port and token, and both speak the same API. Two processes can attach the same directory, so
+both agents work on the same files.
+
+<p align="center">
+  <img src="docs/assets/two-agents.svg" alt="Two native-agent-api containers, one running Claude Code and one running Codex CLI. Your applications reach both over the same REST, SSE and WebSocket interface, and both agents work in one shared project directory." width="100%">
+</p>
+
+With Docker, each installation is one container with its own volumes; see
+[several installations](docker/README.md#several-installations).
 
 ## Quick start
 
@@ -106,6 +115,9 @@ native-agent-api serve --env-file .env
 curl -s http://127.0.0.1:8080/v1/ask -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"prompt":"Explain HTTP/2 in one sentence.","model":{"id":"sonnet","effort":"low"}}' | jq -r .result.text
 ```
+
+`make setup` does these steps interactively: it writes the env file, creates the client token and
+starts the gateway on this machine or in Docker.
 
 The interactive API reference is served at `/docs`, and the OpenAPI 3.1 document at
 `/openapi.yaml`. For Docker, see [docker/README.md](docker/README.md).

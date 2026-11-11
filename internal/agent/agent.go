@@ -116,7 +116,7 @@ type Model struct {
 	ID   string `json:"id"   doc:"Value for model.id."`
 	Name string `json:"name" doc:"Display name."`
 	// Efforts are the reasoning efforts the model accepts; requests are validated against them.
-	Efforts  []string      `json:"efforts"`
+	Efforts  []string      `json:"efforts" doc:"Reasoning efforts the model accepts, as the CLI reports them; values for model.effort."`
 	Provider ModelProvider `json:"provider"`
 }
 

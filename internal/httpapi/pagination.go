@@ -27,7 +27,7 @@ func page[T any](items []T, input PageInput, key func(T) string) (*body[list[T]]
 			}
 		}
 		if start == 0 {
-			return nil, fail(http.StatusUnprocessableEntity, "invalid_cursor", "cursor does not identify an item in the filtered list")
+			return nil, fail(http.StatusUnprocessableEntity, codeInvalidCursor, "cursor does not identify an item in the filtered list")
 		}
 	}
 	end := min(start+listPageSize, len(items))

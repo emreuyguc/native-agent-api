@@ -37,12 +37,12 @@ func (e *apiError) GetStatus() int            { return e.Status }
 func (e *apiError) ContentType(string) string { return problemType }
 
 // fail returns an API error with an explicit code.
-func fail(status int, code, message string) error {
+func fail(status int, code errorCode, message string) error {
 	return newProblem(status, code, message)
 }
 
-func newProblem(status int, code, message string) *apiError {
-	return &apiError{Title: http.StatusText(status), Status: status, Detail: message, Code: code}
+func newProblem(status int, code errorCode, message string) *apiError {
+	return &apiError{Title: http.StatusText(status), Status: status, Detail: message, Code: code.name}
 }
 
 // Errors produced by Huma itself (validation, body limits) use the same format; the code is
@@ -73,22 +73,24 @@ func withRequestID(ctx huma.Context, _ string, value any) (any, error) {
 	return value, nil
 }
 
-func statusCode(status int) string {
+func statusCode(status int) errorCode {
 	switch status {
 	case http.StatusBadRequest, http.StatusUnprocessableEntity:
-		return "invalid_request"
+		return codeInvalidRequest
 	case http.StatusRequestEntityTooLarge:
-		return "request_too_large"
+		return codeRequestTooLarge
+	case http.StatusRequestTimeout:
+		return codeRequestTimeout
 	case http.StatusNotFound:
-		return "not_found"
+		return codeNotFound
 	case http.StatusMethodNotAllowed:
-		return "method_not_allowed"
+		return codeMethodNotAllowed
 	case http.StatusUnsupportedMediaType:
-		return "unsupported_media_type"
+		return codeUnsupportedMediaType
 	case http.StatusNotAcceptable:
-		return "not_acceptable"
+		return codeNotAcceptable
 	default:
-		return "internal_error"
+		return codeInternalError
 	}
 }
 
@@ -102,7 +104,7 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 	_ = json.NewEncoder(w).Encode(value) //nolint:errchkjson // Client disconnects are not actionable.
 }
 
-func writeError(w http.ResponseWriter, r *http.Request, status int, code, message string) {
+func writeError(w http.ResponseWriter, r *http.Request, status int, code errorCode, message string) {
 	problem := newProblem(status, code, message)
 	problem.RequestID = logx.RequestID(r.Context())
 	w.Header().Set("Content-Type", problemType)
