@@ -80,6 +80,13 @@ lint-scripts: ## Check the shell scripts (ShellCheck, Docker)
 	docker run --rm -v "$(CURDIR)":/src:ro -w /src $(call tool_image,shellcheck) \
 	  $$(git ls-files '*.sh' .githooks)
 
+.PHONY: lint-dockerfiles
+lint-dockerfiles: ## Check the Dockerfiles (Hadolint, Docker)
+	@for file in $$(git ls-files '*Dockerfile'); do \
+	  echo "$$file"; \
+	  docker run --rm -i $(call tool_image,hadolint) <"$$file" || exit 1; \
+	done
+
 .PHONY: scan-vulnerabilities
 scan-vulnerabilities: ## Scan Go dependencies for known vulnerabilities
 	go tool govulncheck ./...
@@ -95,6 +102,28 @@ build-images: ## Build the Docker images without pushing (IMAGE=claude|codex|edg
 	  echo "image $$image"; \
 	  docker buildx build --file docker/$$image/Dockerfile $(if $(PLATFORMS),--platform $(PLATFORMS),) . || exit 1; \
 	done
+
+.PHONY: test-image
+test-image: ## Build and smoke-test one agent image without a login (AGENT=claude|codex)
+	@test -n "$(AGENT)" || { echo "pass AGENT=claude or AGENT=codex"; exit 1; }
+	docker/test-image.sh "$(AGENT)"
+
+# Grype reads each image from a `docker save` archive, so it needs no access to the Docker
+# daemon. Its vulnerability database stays in a volume between runs. SARIF=<dir> also writes one
+# SARIF file per image.
+.PHONY: scan-images
+scan-images: ## Scan local images for fixed high or critical vulnerabilities (SCAN="<image> ...", Grype)
+	@test -n "$(SCAN)" || { echo "pass SCAN=\"<image> ...\", for example SCAN=native-agent-api-claude:local"; exit 1; }
+	@archive=$$(mktemp) && trap 'rm -f "$$archive"' EXIT && failed="" && \
+	for image in $(SCAN); do \
+	  echo "image $$image"; \
+	  name=$$(printf '%s' "$$image" | tr -c 'A-Za-z0-9._-' '_'); \
+	  docker save "$$image" -o "$$archive" || exit 1; \
+	  docker run --rm -v "$$archive":/scan/image.tar:ro -v native-agent-api-grype:/cache -e GRYPE_DB_CACHE_DIR=/cache \
+	    $(if $(SARIF),-v "$(abspath $(SARIF))":/out,) $(call tool_image,grype) docker-archive:/scan/image.tar \
+	    --only-fixed --fail-on high -o table $(if $(SARIF),-o sarif=/out/$$name.sarif,) || failed="$$failed $$image"; \
+	done; \
+	test -z "$$failed" || { echo "vulnerable:$$failed"; exit 1; }
 
 .PHONY: build-release-snapshot
 # The image may have an older Go than go.mod; GOTOOLCHAIN=auto fetches the right one into a
@@ -115,7 +144,7 @@ check-pre-commit: verify-modules lint-go lint-workflows check-coverage scan-vuln
 	@echo "check-pre-commit: OK"
 
 .PHONY: check-pre-push
-check-pre-push: check-pre-commit audit-workflows lint-scripts check-api-compatibility check-release-config ## Before a push: adds workflow, script, API and release checks (needs Docker)
+check-pre-push: check-pre-commit audit-workflows lint-scripts lint-dockerfiles check-api-compatibility check-release-config ## Before a push: adds workflow, script, Dockerfile, API and release checks (needs Docker)
 	@echo "check-pre-push: OK"
 
 .PHONY: check-all
