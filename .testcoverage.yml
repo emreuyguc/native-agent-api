@@ -1,0 +1,7 @@
+# Test coverage limits for `make coverage` and the `check` job in CI (go-test-coverage).
+# Raise `total` when coverage grows; never lower it to let a change pass.
+profile: coverage.out
+
+threshold:
+  # Coverage of the whole module, in percent of statements.
+  total: 70
