@@ -1,5 +1,5 @@
 #!/bin/sh
-# Smoke test of one agent image without a login: docker/test-image.sh claude|codex
+# Smoke test of one agent image without a login: docker/test-image.sh claude|codex [--no-build]
 # (or `make test-image AGENT=…`). It writes a throwaway installation to a temporary directory,
 # runs docker/verify.sh on it, and then removes its containers and volumes. The image stays as
 # native-agent-api-imagetest-<agent>:local for `make scan-images`.
@@ -7,6 +7,9 @@
 set -eu
 agent=${1:?usage: docker/test-image.sh claude|codex}
 case $agent in claude | codex) ;; *) echo "unknown agent: $agent" >&2; exit 2 ;; esac
+# --no-build tests native-agent-api-imagetest-<agent>:local as it is: CI builds it with BuildKit.
+case ${2:-} in "" | --no-build) ;; *) echo "unknown option: $2" >&2; exit 2 ;; esac
+no_build=${2:-}
 cd "$(dirname "$0")/.."
 
 dir=$(mktemp -d)
@@ -36,6 +39,8 @@ CONTAINER_MEMORY=1g
 CONTAINER_CPUS=1.0
 EOF
 
-# A fresh build: a cached layer would keep old Alpine packages from the scan.
-docker compose --env-file "$dir/docker.env" build --pull --no-cache
-docker/verify.sh "$dir/docker.env"
+if [ -z "$no_build" ]; then
+  # A fresh build: a cached layer would keep old Alpine packages from the scan.
+  docker compose --env-file "$dir/docker.env" build --pull --no-cache
+fi
+docker/verify.sh "$dir/docker.env" --no-build

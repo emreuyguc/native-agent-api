@@ -122,9 +122,9 @@ check-cli-releases: ## Fail when an agent CLI pin is behind a release older than
 	scripts/check-cli-releases.sh
 
 .PHONY: test-image
-test-image: ## Build and smoke-test one agent image without a login (AGENT=claude|codex)
+test-image: ## Build and smoke-test one agent image without a login (AGENT=claude|codex; NO_BUILD=1 tests the built image)
 	@test -n "$(AGENT)" || { echo "pass AGENT=claude or AGENT=codex"; exit 1; }
-	docker/test-image.sh "$(AGENT)"
+	docker/test-image.sh "$(AGENT)" $(if $(NO_BUILD),--no-build,)
 
 # Grype reads each image from a `docker save` archive, so it needs no access to the Docker
 # daemon. Its vulnerability database stays in a volume between runs. SARIF=<dir> also writes one

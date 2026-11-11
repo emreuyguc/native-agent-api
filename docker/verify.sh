@@ -1,12 +1,19 @@
 #!/bin/sh
 # Smoke test of one Docker installation, run from anywhere:
-#   docker/verify.sh <docker env file>
+#   docker/verify.sh <docker env file> [--no-build]
 # It builds and starts the installation, checks the hardening and the tools the CLI needs, and,
 # when COMPOSE_FILE includes compose.egress.yaml, that only allowlisted hosts are reachable. Then
 # it stops the installation. Volumes stay.
 # shellcheck disable=SC2016 # in_agent commands expand inside the container.
 set -eu
-env_file=${1:?usage: docker/verify.sh <docker env file>}
+env_file=${1:?usage: docker/verify.sh <docker env file> [--no-build]}
+# --no-build starts the image that already exists, for example one CI has built.
+build=--build
+case ${2:-} in
+  "") ;;
+  --no-build) build="" ;;
+  *) echo "unknown option: $2" >&2; exit 2 ;;
+esac
 env_file=$(cd "$(dirname "$env_file")" && pwd)/$(basename "$env_file")
 cd "$(dirname "$0")/.."
 value() { sed -n "s/^$1=//p" "$env_file" | tail -n 1; }
@@ -15,7 +22,7 @@ compose() { docker compose --env-file "$env_file" "$@"; }
 in_agent() { compose exec -T agent sh -c "$1"; }
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
-compose up -d --build --wait
+compose up -d $build --wait
 trap 'compose stop >/dev/null 2>&1' EXIT
 
 in_agent 'test "$(id -u)" = 65532' || fail "not running as uid 65532"
