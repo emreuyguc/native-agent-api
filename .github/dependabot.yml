@@ -1,4 +1,6 @@
 # Weekly update pull requests for Go modules, the pinned GitHub Actions and the Docker base images.
+# A release is proposed only after 14 days, so a compromised or broken release can be withdrawn
+# before it reaches this repository.
 # The agent CLI releases (cli_version in docker/<agent>/Dockerfile) are updated by hand: Dependabot
 # does not know them.
 version: 2
@@ -7,6 +9,8 @@ updates:
     directories: [/, /tools]
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 14
     groups:
       go-modules:
         update-types: [minor, patch]
@@ -15,6 +19,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 14
     groups:
       github-actions:
         update-types: [minor, patch]
@@ -27,6 +33,8 @@ updates:
       - /docker/edge
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 14
     groups:
       docker-images:
         patterns: ["*"]
