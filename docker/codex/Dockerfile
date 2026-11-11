@@ -12,13 +12,15 @@ COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY cmd ./cmd
 COPY internal ./internal
-# The version is the nearest tag and commit; -dirty marks uncommitted changes in the built sources.
+# The version is the nearest tag and commit; -dirty marks changes to tracked files in the built
+# sources, like `git describe --dirty`. Untracked files do not count: .gitignore is not in the
+# build context.
 RUN --mount=type=bind,source=.git,target=.git \
     --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
     export GIT_OPTIONAL_LOCKS=0; \
     git config --global --add safe.directory /src; \
     version=$(git describe --tags --always); \
-    if [ -n "$(git status --porcelain -- go.mod go.sum cmd internal)" ]; then version="$version-dirty"; fi; \
+    if [ -n "$(git status --porcelain --untracked-files=no -- go.mod go.sum cmd internal)" ]; then version="$version-dirty"; fi; \
     CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -buildvcs=false \
       -ldflags="-s -w \
         -X github.com/emreuyguc/native-agent-api/internal/buildinfo.Version=${version} \
