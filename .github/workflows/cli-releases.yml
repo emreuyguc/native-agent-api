@@ -1,0 +1,26 @@
+name: cli-releases
+
+# Each week this fails when an agent CLI pin (cli_version in docker/<agent>/Dockerfile) is behind
+# a release older than 14 days. GitHub reports a failed scheduled run by e-mail. The update stays
+# by hand: new checksums, and the real CLI checks of docs/testing.md.
+on:
+  schedule:
+    - cron: "11 5 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The token only raises the GitHub API rate limit for reading public releases.
+      - run: make check-cli-releases
+        env:
+          GH_TOKEN: ${{ github.token }}

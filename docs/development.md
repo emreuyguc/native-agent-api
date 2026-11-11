@@ -23,17 +23,18 @@ cache for the images.
 
 | Target | When | What it runs | Time (warm) |
 |---|---|---|---|
-| `make check-pre-commit` | Before a commit; needs only Go | `verify-modules`, `lint-go`, `lint-workflows`, `check-coverage` (runs `test`), `scan-vulnerabilities` | Seconds when little changed; about 50 s from scratch |
+| `make check-pre-commit` | Before a commit; needs only Go | `verify-modules`, `lint-go`, `lint-workflows`, `check-coverage` (runs `test`), `scan-vulnerabilities`, `check-licenses` | Seconds when little changed; about 50 s from scratch |
 | `make check-pre-push` | Before a push; needs Docker | `check-pre-commit`, then `audit-workflows`, `lint-scripts`, `lint-dockerfiles`, `check-api-compatibility`, `check-release-config` | About 30 s more |
 | `make check-all` | Before a release or a large change | `check-pre-push`, then `test-fuzz`, `build-images`, `build-release-snapshot` | Some minutes |
 
 | Target | Checks | CI job |
 |---|---|---|
-| `verify-modules`, `lint-go`, `lint-workflows`, `check-coverage`, `scan-vulnerabilities`, `lint-scripts`, `lint-dockerfiles`, `check-release-config` | Modules, Go lint, workflow lint, tests and coverage, known vulnerabilities, shell scripts, Dockerfiles (Hadolint), `.goreleaser.yaml` | `ci` / `check` |
+| `verify-modules`, `lint-go`, `lint-workflows`, `check-coverage`, `scan-vulnerabilities`, `check-licenses`, `lint-scripts`, `lint-dockerfiles`, `check-release-config` | Modules, Go lint, workflow lint, tests and coverage, known vulnerabilities, licenses of the linked packages, shell scripts, Dockerfiles (Hadolint), `.goreleaser.yaml` | `ci` / `check` |
 | `test` | The tests on macOS, for the darwin binaries | `ci` / `macos` |
 | `audit-workflows` | Workflow security (zizmor) | `ci` / `workflows` |
 | `check-api-compatibility BASE=…` | API changes that break clients | `api` / `breaking-changes` |
-| `test-fuzz FUZZTIME=…` | New fuzz inputs; `check-all` uses 10 seconds per target | `fuzz`, weekly with 2 minutes |
+| `test-fuzz FUZZTIME=…` | New fuzz inputs; `FUZZ_PKG=` and `FUZZ_TARGET=` pick one target; `check-all` uses 10 seconds per target | `fuzz`, weekly, one job of 10 minutes per target |
+| `check-cli-releases` | Each agent CLI pin is at most 14 days behind its releases | `cli-releases`, weekly |
 | `build-images` | The Docker images, without pushing | `ci` / `docker` (amd64 and arm64) |
 | `test-image AGENT=…` | One agent image starts hardened and healthy without a login (`docker/verify.sh`) | `ci` / `docker` (amd64) |
 | `scan-images SCAN=…` | Local images have no fixed high or critical vulnerability (Grype) | `ci` / `docker`; `scan`, weekly over the latest release |
@@ -66,12 +67,22 @@ provenance and publishing of a release.
 
 | Tools | Version pinned in | Runs with |
 |---|---|---|
-| actionlint, oasdiff, go-test-coverage | `tools/go.mod` | `go tool` |
+| actionlint, oasdiff, go-test-coverage, go-licenses | `tools/go.mod` | `go tool` |
 | golangci-lint | `tools/golangci-lint/go.mod` | `go tool`; its own module because of its dependencies |
 | govulncheck | `go.mod` | `go tool` |
 | zizmor, ShellCheck, Hadolint, Grype, GoReleaser | `tools/docker/<name>/Dockerfile` (tag and digest) | Docker; the release workflow runs the same GoReleaser version |
 
 None of them changes the product's dependencies. Dependabot updates all of them.
+
+### Agent CLI versions
+
+Dependabot does not know the agent CLIs. The weekly `cli-releases` workflow fails when a pin is
+behind a release older than 14 days. To update one:
+
+1. In `docker/<agent>/Dockerfile`, set `cli_version` and the SHA-256 of each platform download.
+2. Set `TestedVersion` in the adapter's `Descriptor` and the agent row of `README.md`; a test checks
+   that all three agree.
+3. Run the real CLI checks of [testing](testing.md).
 
 ## API compatibility
 
