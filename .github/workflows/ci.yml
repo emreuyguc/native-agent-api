@@ -45,7 +45,7 @@ jobs:
         if: ${{ !cancelled() && hashFiles('coverage.txt') != '' }}
         run: |
           { echo '```'; cat coverage.txt; echo '```'; } >>"$GITHUB_STEP_SUMMARY"
-      - run: make lint-scripts check-release-config
+      - run: make lint-scripts lint-dockerfiles check-release-config
 
   # The release ships darwin binaries; process groups, the process table and os.Root differ there.
   macos:
@@ -108,3 +108,11 @@ jobs:
           push: false
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+      # An agent image must start hardened and healthy without a login, and its packages must have
+      # no fixed high or critical vulnerability. The edge image is scanned weekly (scan.yml).
+      - name: Smoke test ${{ matrix.image }} image (amd64)
+        if: matrix.image != 'edge'
+        run: make test-image AGENT=${{ matrix.image }}
+      - name: Scan ${{ matrix.image }} image
+        if: matrix.image != 'edge'
+        run: make scan-images SCAN=native-agent-api-imagetest-${{ matrix.image }}:local

@@ -43,6 +43,8 @@ updates:
   - package-ecosystem: docker
     directories:
       - /tools/docker/goreleaser
+      - /tools/docker/grype
+      - /tools/docker/hadolint
       - /tools/docker/shellcheck
       - /tools/docker/zizmor
     schedule:

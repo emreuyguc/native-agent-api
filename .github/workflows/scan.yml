@@ -1,0 +1,48 @@
+name: scan
+
+# The published images get new vulnerabilities after their release. Each week Grype scans the
+# images of the latest release; a fixed high or critical one fails the run and appears in the
+# Security tab. The fix is a patch release: the images rebuild with the current Alpine packages.
+on:
+  schedule:
+    - cron: "41 4 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  images:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read # find the latest release
+      security-events: write # upload the results to code scanning
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Pull the images of the latest release
+        id: images
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          version=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq '.tagName | ltrimstr("v")')
+          images=""
+          for name in claude codex edge; do
+            image="ghcr.io/$OWNER/native-agent-api-$name:$version"
+            docker pull -q "$image"
+            images="$images $image"
+          done
+          echo "images=${images# }" >>"$GITHUB_OUTPUT"
+      - name: Scan
+        env:
+          IMAGES: ${{ steps.images.outputs.images }}
+        run: |
+          mkdir -p sarif
+          make scan-images SCAN="$IMAGES" SARIF=sarif
+      - uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        if: ${{ !cancelled() && hashFiles('sarif/*.sarif') != '' }}
+        with:
+          sarif_file: sarif
+          category: grype

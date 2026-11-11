@@ -48,6 +48,12 @@ A `vX.Y.Z-rc.N` tag runs the same jobs. It uses the `CHANGELOG.md` section of `X
 pre-release and moves no `<major>.<minor>` image tag. Tag the release commit with
 `v0.3.0-rc.1` first, then with `v0.3.0` when the candidate is good.
 
+## Patch releases for image vulnerabilities
+
+The `scan` workflow scans the images of the latest release each week. When it fails, a fixed
+high or critical vulnerability exists in a package of the image. Release a patch version: the
+images rebuild with the current Alpine packages.
+
 ## Verify a release
 
 The attestations are signed through Sigstore without a key. The

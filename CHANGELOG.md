@@ -12,6 +12,11 @@ All notable changes to this project are documented here. The format is based on
   verification. It accepts only `vX.Y.Z` and `vX.Y.Z-rc.N` tags on `main`. A release candidate
   becomes a pre-release. The images no longer get a `latest` tag.
 
+### Security
+
+- Images: the build upgrades the Alpine packages of the base image. The 0.2.0 images contain
+  zlib 1.3.2-r1 with CVE-2026-4738 (critical); a rebuilt image has 1.4-r0.
+
 ## [0.2.0] - 2026-11-11
 
 The first release with downloadable binaries and Docker images, a simpler Docker setup and an
