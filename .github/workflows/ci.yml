@@ -110,9 +110,22 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
       # An agent image must start hardened and healthy without a login, and its packages must have
       # no fixed high or critical vulnerability. The edge image is scanned weekly (scan.yml).
+      # The amd64 image comes from the cache of the build above. Only the runtime stage is built
+      # again, so its Alpine packages are current for the scan.
+      - name: Load ${{ matrix.image }} image (amd64)
+        if: matrix.image != 'edge'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: docker/${{ matrix.image }}/Dockerfile
+          platforms: linux/amd64
+          load: true
+          tags: native-agent-api-imagetest-${{ matrix.image }}:local
+          cache-from: type=gha,scope=${{ matrix.image }}
+          no-cache-filters: runtime
       - name: Smoke test ${{ matrix.image }} image (amd64)
         if: matrix.image != 'edge'
-        run: make test-image AGENT=${{ matrix.image }}
+        run: make test-image AGENT=${{ matrix.image }} NO_BUILD=1
       - name: Scan ${{ matrix.image }} image
         if: matrix.image != 'edge'
         run: make scan-images SCAN=native-agent-api-imagetest-${{ matrix.image }}:local
