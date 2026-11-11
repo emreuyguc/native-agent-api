@@ -91,7 +91,7 @@ func (s *Server) Handler() http.Handler {
 	api := s.newAPI(mux)
 	// Unknown paths answer with the same problem format as every other error.
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		writeError(w, r, http.StatusNotFound, "not_found", "No operation exists at this path.")
+		writeError(w, r, http.StatusNotFound, codeNotFound, "No operation exists at this path.")
 	})
 	public := map[string]bool{healthPath: true, readyPath: true}
 	if s.cfg.Docs {

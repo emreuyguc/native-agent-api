@@ -60,7 +60,7 @@ other need separate gateways.
 | Filesystem | Paths reject absolute, `..`, NUL, backslash and symlinks; every operation runs on an `os.Root`; only single-link regular files are opened, without blocking; atomic uploads; entry limits on delete and copy |
 | Native options | Strict per-adapter schemas; gateway-owned keys (sandbox, approval, config paths) rejected. Plugins, MCP, hooks and native controls act with the client's authority, which already includes starting commands. The agent cannot call them: the CLI sandbox blocks loopback to the gateway |
 | Secrets in output | Tokens redacted in errors and debug output; body logging off by default, never for file transfers or login |
-| Container | Non-root UID, read-only root filesystem, no capabilities, `no-new-privileges`, PID limit, bounded tmpfs, pinned CLI checksums. Optional egress overlay: no route or external DNS, only allowlisted hosts through a proxy |
+| Container | Non-root UID, read-only root filesystem, no capabilities, `no-new-privileges`, PID limit, bounded tmpfs, pinned CLI checksums. The container gets only the application env file, never the Docker env file (`docker/verify.sh` checks it). Optional egress overlay: no route or external DNS, only allowlisted hosts through a proxy |
 
 ## Protections with regression tests
 
@@ -84,7 +84,7 @@ CLI: `make test-host AGENT=claude|codex`.
 |---|---|---|
 | D-1 | Gateway and agent share one OS user | Separate users need `CAP_SETUID`, which turns a gateway compromise into root in the container, for little gain: the agent reads its own login anyway. See the limits below |
 | D-2 | Loopback may run without a token | For local use. F-1 and F-2 stop web pages; other processes of the same user already are that user; a sandboxed agent cannot connect to `127.0.0.1` |
-| D-3 | Egress is open by default; a restricted overlay is optional | Web tools, MCP and package installs need it. `docker/compose.<agent>.egress.yaml` allows only the provider API and listed hosts |
+| D-3 | Egress is open by default; a restricted overlay is optional | Web tools, MCP and package installs need it. `docker/compose.egress.yaml` allows only the provider API and listed hosts |
 
 ## Known limits
 

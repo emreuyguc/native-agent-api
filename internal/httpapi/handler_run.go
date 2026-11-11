@@ -214,7 +214,7 @@ func (s *Server) startRun(ctx context.Context, req agent.Request, interactive bo
 			req.NativeForkFrom = info.NativeSessionID
 		}
 		if req.SessionMode != agent.SessionNew && req.NativeSessionID == "" && req.NativeForkFrom == "" {
-			return nil, fail(http.StatusConflict, "native_session_unavailable", "The session has no native CLI binding.")
+			return nil, fail(http.StatusConflict, codeNativeSessionUnavailable, "The session has no native CLI binding.")
 		}
 	}
 
@@ -223,7 +223,7 @@ func (s *Server) startRun(ctx context.Context, req agent.Request, interactive bo
 	default:
 		s.log.WarnContext(ctx, "run rejected: concurrency limit reached", "limit", cap(s.slots))
 		return nil, huma.ErrorWithHeaders(
-			fail(http.StatusTooManyRequests, "gateway_busy", "The gateway has reached its concurrency limit."),
+			fail(http.StatusTooManyRequests, codeGatewayBusy, "The gateway has reached its concurrency limit."),
 			http.Header{"Retry-After": {"2"}})
 	}
 	releaseSlot := func() { <-s.slots }
@@ -242,7 +242,7 @@ func (s *Server) startRun(ctx context.Context, req agent.Request, interactive bo
 			releaseSlot()
 			if errors.Is(err, session.ErrBusy) {
 				s.log.WarnContext(ctx, "run rejected: session already running", "workspace_id", req.WorkspaceID, "session_id", req.SessionID)
-				return nil, fail(http.StatusConflict, "session_busy", "Another run is already active for this session.")
+				return nil, fail(http.StatusConflict, codeSessionBusy, "Another run is already active for this session.")
 			}
 			return nil, s.workspaceError(ctx, err)
 		}
@@ -285,7 +285,7 @@ func (s *Server) startRun(ctx context.Context, req agent.Request, interactive bo
 func (s *Server) createRun(ctx context.Context, in *struct{ Body startRunRequest }) (*runAccepted, error) {
 	body := &in.Body
 	if strings.TrimSpace(body.WorkspaceID) == "" {
-		return nil, fail(http.StatusUnprocessableEntity, "invalid_request", "workspace_id is required; use /v1/ask for a call without a workspace")
+		return nil, fail(http.StatusUnprocessableEntity, codeInvalidRequest, "workspace_id is required; use /v1/ask for a call without a workspace")
 	}
 	req := agent.Request{Prompt: body.Prompt, WorkspaceID: body.WorkspaceID}
 	body.settings().Apply(&req)
@@ -345,7 +345,7 @@ func (*Server) accepted(started *run.Run, err error) (*runAccepted, error) {
 // disconnecting cancels it.
 func (s *Server) ask(ctx context.Context, in *struct{ Body askRequest }) (*huma.StreamResponse, error) {
 	if in.Body.Tools != nil && in.Body.Tools.Permissions == agent.PermissionsAsk {
-		return nil, fail(http.StatusUnprocessableEntity, "invalid_request",
+		return nil, fail(http.StatusUnprocessableEntity, codeInvalidRequest,
 			`tools.permissions "ask" needs an event stream to answer permission requests: use /v1/ask/stream`)
 	}
 	started, err := s.startRun(ctx, in.Body.request(), false)
@@ -367,10 +367,10 @@ func (s *Server) ask(ctx context.Context, in *struct{ Body askRequest }) (*huma.
 		snapshot := started.Snapshot()
 		if snapshot.Error != nil {
 			status := http.StatusBadGateway
-			if snapshot.Error.Code == "timeout" {
+			if snapshot.Error.Code == run.ErrorTimeout {
 				status = http.StatusGatewayTimeout
 			}
-			writeError(w, r, status, snapshot.Error.Code, snapshot.Error.Message)
+			writeError(w, r, status, runErrorCodes[snapshot.Error.Code], snapshot.Error.Message)
 			return
 		}
 		writeJSON(w, http.StatusOK, snapshot)
@@ -409,7 +409,7 @@ type runListInput struct {
 func (s *Server) listRuns(_ context.Context, input *runListInput) (*body[list[run.Snapshot]], error) {
 	if input.WorkspaceID != "" && !ids.ValidWorkspaceID(input.WorkspaceID) ||
 		input.SessionID != "" && !ids.ValidSessionID(input.SessionID) {
-		return nil, fail(http.StatusUnprocessableEntity, "invalid_filter", "workspace_id or session_id is invalid")
+		return nil, fail(http.StatusUnprocessableEntity, codeInvalidFilter, "workspace_id or session_id is invalid")
 	}
 	all := s.runs.List()
 	filtered := all[:0]
@@ -555,24 +555,24 @@ func runError(err error) error {
 	return fail(status, code, message)
 }
 
-func runErrorInfo(err error) (status int, code, message string) {
+func runErrorInfo(err error) (status int, code errorCode, message string) {
 	switch {
 	case errors.Is(err, run.ErrFinished):
-		return http.StatusConflict, "run_finished", "The run has already finished."
+		return http.StatusConflict, codeRunFinished, "The run has already finished."
 	case errors.Is(err, run.ErrNotInteractive):
-		return http.StatusConflict, "run_not_interactive", "An ask run answers a single prompt; continue its session instead."
+		return http.StatusConflict, codeRunNotInteractive, "An ask run answers a single prompt; continue its session instead."
 	case errors.Is(err, run.ErrInputClosed):
-		return http.StatusConflict, "run_input_closed", "The run no longer accepts messages."
+		return http.StatusConflict, codeRunInputClosed, "The run no longer accepts messages."
 	case errors.Is(err, run.ErrUnknownPermission):
-		return http.StatusNotFound, "permission_not_pending", "No pending permission request has this id."
+		return http.StatusNotFound, codePermissionNotFound, "No pending permission request has this id."
 	case errors.Is(err, run.ErrUnknownControl):
-		return http.StatusNotFound, "control_not_pending", "No pending control request has this id."
+		return http.StatusNotFound, codeControlNotPending, "No pending control request has this id."
 	case errors.Is(err, agent.ErrControlRejected):
-		return http.StatusUnprocessableEntity, "control_rejected", err.Error()
+		return http.StatusUnprocessableEntity, codeControlRejected, err.Error()
 	case errors.Is(err, context.DeadlineExceeded):
-		return http.StatusGatewayTimeout, "control_timeout", "The agent did not answer the control request in time."
+		return http.StatusGatewayTimeout, codeControlTimeout, "The agent did not answer the control request in time."
 	case errors.Is(err, errUnsupportedControl):
-		return http.StatusBadRequest, "unsupported_control", err.Error()
+		return http.StatusBadRequest, codeUnsupportedControl, err.Error()
 	default:
 		return agentErrorInfo(err)
 	}
@@ -597,7 +597,7 @@ func (in *streamInput) position() (int64, error) {
 	}
 	after, err := strconv.ParseInt(raw, 10, 64)
 	if err != nil || after < 0 {
-		return 0, fail(http.StatusBadRequest, "invalid_request", "after / Last-Event-ID must be a non-negative integer.")
+		return 0, fail(http.StatusBadRequest, codeInvalidRequest, "after / Last-Event-ID must be a non-negative integer.")
 	}
 
 	return after, nil
@@ -744,7 +744,7 @@ func (s *Server) serveWebSocket(w http.ResponseWriter, r *http.Request, found *r
 				_, code, text := runErrorInfo(err)
 				_ = writeWS(ctx, conn, map[string]any{
 					"type": "control_error",
-					"data": map[string]string{"control": message.Type, "code": code, "message": text},
+					"data": map[string]string{"control": message.Type, "code": code.name, "message": text},
 				})
 				continue
 			}
@@ -812,7 +812,7 @@ func (s *Server) wsNativeControl(ctx context.Context, conn *websocket.Conn, targ
 		_, code, text := runErrorInfo(err)
 		_ = writeWS(ctx, conn, map[string]any{
 			"type": "control_error", "id": message.ID,
-			"data": map[string]string{"control": "control", "code": code, "message": text},
+			"data": map[string]string{"control": "control", "code": code.name, "message": text},
 		})
 		return
 	}
@@ -823,7 +823,7 @@ func (s *Server) wsNativeControl(ctx context.Context, conn *websocket.Conn, targ
 func (s *Server) lookupRun(id string) (*run.Run, error) {
 	found, err := s.runs.Get(id)
 	if err != nil {
-		return nil, fail(http.StatusNotFound, "run_not_found", "Run was not found or has expired.")
+		return nil, fail(http.StatusNotFound, codeRunNotFound, "Run was not found or has expired.")
 	}
 
 	return found, nil

@@ -13,8 +13,9 @@
 #   -e FILE       Env file: start bin/native-agent-api with it and read limits from it
 #   -a AGENT      With -e: serve claude or codex, overriding NATIVE_AGENT_AGENT (default: asked)
 #   -s "IDS"      Steps or sections to run, e.g. "all", "2 4", "5.5 6.1" (default: menu)
-#   -d AGENT      Docker: prepare docker/.env and the app env file, build, start and log in the
-#                 claude or codex container, run the sections, then the Docker steps (10.x)
+#   -d AGENT      Docker: prepare docker/AGENT.env and its application env file, build, start
+#                 and log in the claude or codex container, run the sections, then the Docker
+#                 steps (10.x)
 #   -m MODE       host (default) or docker (a container started elsewhere); docker skips checks
 #                 that need the host filesystem or process table
 #   -r DIR        Directory under NATIVE_AGENT_ALLOWED_ROOTS for the attach step (4.10)
@@ -198,12 +199,8 @@ trap 'exit 130' INT TERM
 
 # ---------------------------------------------------------------- docker
 
-COMPOSE_ENV="$ROOT/docker/.env" EGRESS=false
-compose() {
-  local files=(-f "$ROOT/docker/compose.yaml" -f "$ROOT/docker/compose.$DOCKER_AGENT.yaml")
-  $EGRESS && files+=(-f "$ROOT/docker/compose.$DOCKER_AGENT.egress.yaml")
-  docker compose --env-file "$COMPOSE_ENV" "${files[@]}" --profile "$DOCKER_AGENT" "$@"
-}
+COMPOSE_ENV="" EGRESS_ENV=""
+compose() { docker compose --env-file "$COMPOSE_ENV" "$@"; }
 kv() { grep -E "^$2=" "$1" 2>/dev/null | tail -1 | cut -d= -f2-; }
 set_kv() { # set_kv FILE KEY VALUE: replace or append KEY=VALUE, keeping the file mode
   local tmp
@@ -212,11 +209,10 @@ set_kv() { # set_kv FILE KEY VALUE: replace or append KEY=VALUE, keeping the fil
     END { if (!done) print k "=" v }' "$1" >"$tmp" && cat "$tmp" >"$1"
   rm -f "$tmp"
 }
-upper() { tr '[:lower:]' '[:upper:]' <<<"$1"; }
 
 # In a container the values below are not choices: the container is the isolation boundary
 # (bubblewrap cannot create namespaces there), HOME is a volume so the native profile persists,
-# and the compose files mount /data and /projects.
+# and docker/compose.yaml mounts /data and /projects.
 DOCKER_FIXED=(
   NATIVE_AGENT_LISTEN=0.0.0.0:8080 NATIVE_AGENT_SANDBOX_MODE=external NATIVE_AGENT_DATA_DIR=/data
   NATIVE_AGENT_PROFILE_DIR=native NATIVE_AGENT_ALLOWED_ROOTS=/projects
@@ -226,20 +222,30 @@ docker_prepare() {
   command -v docker >/dev/null || { echo "docker is required" >&2; exit 2; }
   docker compose version >/dev/null 2>&1 || { echo "Docker Compose v2 is required" >&2; exit 2; }
   [[ -x $ROOT/bin/native-agent-api ]] || { echo "run make build first (new-token)" >&2; exit 2; }
-  local prefix app token_file pair key
-  prefix=$(upper "$DOCKER_AGENT")
+  local app token_file pair key port
+  COMPOSE_ENV="$ROOT/docker/$DOCKER_AGENT.env"
+  port=8701
+  [[ $DOCKER_AGENT == codex ]] && port=8702
   if [[ ! -f $COMPOSE_ENV ]]; then
     cp "$ROOT/docker/.env.example" "$COMPOSE_ENV"
     chmod 600 "$COMPOSE_ENV"
-    echo "created docker/.env from the example"
+    set_kv "$COMPOSE_ENV" COMPOSE_PROJECT_NAME "native-agent-api-$DOCKER_AGENT"
+    set_kv "$COMPOSE_ENV" CONTAINER_AGENT "$DOCKER_AGENT"
+    set_kv "$COMPOSE_ENV" CONTAINER_IMAGE "native-agent-api-$DOCKER_AGENT:local"
+    set_kv "$COMPOSE_ENV" CONTAINER_PUBLISH_PORT "$port"
+    set_kv "$COMPOSE_ENV" CONTAINER_EGRESS_ALLOW_FILE "./$DOCKER_AGENT/egress-allow.txt"
+    echo "created docker/$DOCKER_AGENT.env from the example"
   fi
+  [[ $(kv "$COMPOSE_ENV" CONTAINER_AGENT) == "$DOCKER_AGENT" ]] ||
+    { echo "$COMPOSE_ENV: CONTAINER_AGENT must be $DOCKER_AGENT" >&2; exit 2; }
   set_kv "$COMPOSE_ENV" BUILD_VERSION "$(git -C "$ROOT" describe --always --dirty 2>/dev/null || echo 0.0.0-dev)"
   set_kv "$COMPOSE_ENV" BUILD_COMMIT "$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo 0000000000000000000000000000000000000000)"
   set_kv "$COMPOSE_ENV" BUILD_DATE "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-  app=$(kv "$COMPOSE_ENV" "${prefix}_APP_ENV_FILE")
+  app=$(kv "$COMPOSE_ENV" CONTAINER_APP_ENV_FILE)
+  [[ $app == /* ]] || app="$ROOT/docker/$app"
   token_file="$ROOT/docker/$DOCKER_AGENT.token.local.env"
-  if [[ -z $app || $app == /absolute/path/* || ! -f $app ]]; then
+  if [[ $app == /absolute/path/* || ! -f $app ]]; then
     app="$ROOT/docker/$DOCKER_AGENT.app.local.env"
     if [[ ! -f $app ]]; then
       local generated digest
@@ -249,10 +255,11 @@ docker_prepare() {
       chmod 600 "$app"
       set_kv "$app" NATIVE_AGENT_AGENT "$DOCKER_AGENT"
       set_kv "$app" NATIVE_AGENT_TOKEN_SHA256 "$digest"
+      for pair in "${DOCKER_FIXED[@]}"; do set_kv "$app" "${pair%%=*}" "${pair#*=}"; done
       (umask 077; sed -n 2p <<<"$generated" | tr -d ' ' >"$token_file")
       echo "created $app and its client token in $token_file"
     fi
-    set_kv "$COMPOSE_ENV" "${prefix}_APP_ENV_FILE" "$app"
+    set_kv "$COMPOSE_ENV" CONTAINER_APP_ENV_FILE "$app"
   fi
   for pair in "${DOCKER_FIXED[@]}"; do
     key=${pair%%=*}
@@ -262,8 +269,12 @@ docker_prepare() {
     fi
   done
   [[ $(kv "$app" NATIVE_AGENT_AGENT) == "$DOCKER_AGENT" ]] || { echo "$app serves $(kv "$app" NATIVE_AGENT_AGENT), not $DOCKER_AGENT" >&2; exit 2; }
+  # The same installation with the restricted egress overlay, for 10.4.
+  EGRESS_ENV="$OUT/docker-egress.env"
+  (umask 077; cp "$COMPOSE_ENV" "$EGRESS_ENV")
+  set_kv "$EGRESS_ENV" COMPOSE_FILE docker/compose.yaml:docker/compose.egress.yaml
   [[ -z ${NATIVE_AGENT_CLIENT_TOKEN-} && -f $token_file ]] && NATIVE_AGENT_CLIENT_TOKEN=$(cat "$token_file")
-  URL="http://$(kv "$COMPOSE_ENV" "${prefix}_HOST"):$(kv "$COMPOSE_ENV" "${prefix}_PORT")"
+  URL="http://$(kv "$COMPOSE_ENV" CONTAINER_PUBLISH_ADDR):$(kv "$COMPOSE_ENV" CONTAINER_PUBLISH_PORT)"
   URL=${URL/0.0.0.0/127.0.0.1}
 }
 
@@ -279,7 +290,7 @@ wait_health() {
 docker_start() {
   printf '\n%s10.1 Build, hardening and start%s\n' "$B" "$N"
   STEP=10.1
-  if "$ROOT/docker/verify.sh" "$DOCKER_AGENT" >"$OUT/10.1-verify.log" 2>&1; then
+  if "$ROOT/docker/verify.sh" "$COMPOSE_ENV" >"$OUT/10.1-verify.log" 2>&1; then
     pass "image builds and passes docker/verify.sh"
   else
     fail "image builds and passes docker/verify.sh" "OK" "$(tail -3 "$OUT/10.1-verify.log")"
@@ -287,7 +298,7 @@ docker_start() {
   fi
   { compose up -d --wait >>"$OUT/10.1-verify.log" 2>&1 && wait_health; } || { echo "the container did not start" >&2; exit 1; }
   pass "container healthy on $URL"
-  compose exec -T "$DOCKER_AGENT" mkdir -p /projects/acceptance
+  compose exec -T agent mkdir -p /projects/acceptance
   [[ -n $ATTACH_DIR ]] || ATTACH_DIR=/projects/acceptance
 }
 
@@ -296,7 +307,7 @@ docker_login() {
   STEP=10.2
   api GET /v1/agent/status
   if [[ $(j .logged_in) == true ]]; then
-    pass "already logged in (the login lives in the $DOCKER_AGENT-home volume)"
+    pass "already logged in (the login lives in the $(kv "$COMPOSE_ENV" COMPOSE_PROJECT_NAME)-home volume)"
     return 0
   fi
   if $YES; then
@@ -330,7 +341,7 @@ docker_login() {
 # restart_gateway: restart the served gateway (host: the process this script started).
 restart_gateway() {
   if [[ $MODE == docker && -n $DOCKER_AGENT ]]; then
-    compose restart "$DOCKER_AGENT" >/dev/null 2>&1 && wait_health
+    compose restart agent >/dev/null 2>&1 && wait_health
   else
     stop_gateway
     start_gateway
@@ -342,7 +353,7 @@ docker_steps() {
   if step 10.3 "Restart keeps the login, workspaces and sessions"; then
     ensure_session
     local run
-    compose restart "$DOCKER_AGENT" >/dev/null 2>&1 && wait_health
+    compose restart agent >/dev/null 2>&1 && wait_health
     api GET /v1/agent/status
     expect "still logged in" true "$(j .logged_in)"
     api GET "/v1/workspaces/$WS"
@@ -354,16 +365,18 @@ docker_steps() {
     close_run "$run"
   fi
   if step 10.4 "Restricted egress overlay"; then
-    ask_user "Restart the container with only the provider's hosts reachable (compose.$DOCKER_AGENT.egress.yaml)?"
+    ask_user "Restart the container with only the provider's hosts reachable (docker/compose.egress.yaml)?"
     if [[ $? == 1 ]]; then
       skip "restricted egress" "declined"
     else
-      if "$ROOT/docker/verify.sh" "$DOCKER_AGENT" --egress >"$OUT/10.4-verify.log" 2>&1; then
-        pass "docker/verify.sh --egress: direct egress closed, unlisted host filtered, provider reachable"
+      compose down >>"$OUT/10.4-verify.log" 2>&1
+      if "$ROOT/docker/verify.sh" "$EGRESS_ENV" >"$OUT/10.4-verify.log" 2>&1; then
+        pass "docker/verify.sh with the egress overlay: direct egress closed, unlisted host filtered, provider reachable"
       else
-        fail "docker/verify.sh --egress" "OK" "$(tail -3 "$OUT/10.4-verify.log")"
+        fail "docker/verify.sh with the egress overlay" "OK" "$(tail -3 "$OUT/10.4-verify.log")"
       fi
-      EGRESS=true
+      local open_env=$COMPOSE_ENV
+      COMPOSE_ENV=$EGRESS_ENV
       compose up -d --wait >>"$OUT/10.4-verify.log" 2>&1 && wait_health
       ensure_workspace
       ask "Reply with exactly PONG."
@@ -371,7 +384,7 @@ docker_steps() {
       ask "Run: curl -s -m 10 -o /dev/null -w '%{http_code}' https://example.com . Reply with exactly FETCHED if it printed 200, otherwise BLOCKED." "$WS"
       expect_match "an unlisted host is blocked" BLOCKED "$(answer)"
       compose down >>"$OUT/10.4-verify.log" 2>&1
-      EGRESS=false
+      COMPOSE_ENV=$open_env
       compose up -d --wait >>"$OUT/10.4-verify.log" 2>&1 && wait_health
       pass "back to unrestricted egress"
     fi
@@ -382,7 +395,7 @@ docker_steps() {
       0) compose down >/dev/null 2>&1; pass "stopped; volumes kept" ;;
       *) skip "stop" "left running on $URL" ;;
     esac
-    echo "  To delete everything, including the login: docker compose --env-file docker/.env -f docker/compose.yaml -f docker/compose.$DOCKER_AGENT.yaml --profile $DOCKER_AGENT down -v"
+    echo "  To delete everything, including the login: docker compose --env-file docker/$DOCKER_AGENT.env down -v"
   fi
 }
 
@@ -837,7 +850,7 @@ section_8() {
   if step 8.8 "Secrets in the gateway log"; then
     if [[ -n $DOCKER_AGENT ]]; then
       GW_LOG="$OUT/gateway.log"
-      compose logs --no-color "$DOCKER_AGENT" >"$GW_LOG" 2>&1
+      compose logs --no-color agent >"$GW_LOG" 2>&1
     fi
     if [[ -z $GW_LOG ]]; then
       skip "log scan" "start the gateway with -e or -d to capture its log"

@@ -14,8 +14,13 @@ import (
 	"github.com/emreuyguc/native-agent-api/internal/agent"
 )
 
-// PermissionModes are the native modes accepted with permissions "ask".
-var PermissionModes = []string{"acceptEdits", "auto", "dontAsk", "manual", "plan"}
+// Values accepted by the options of the same name, from their enum tags.
+var (
+	// PermissionModes are the native modes accepted with permissions "ask".
+	PermissionModes      = agent.EnumOf[RequestOptions]("PermissionMode")
+	fileCheckpointing    = agent.EnumOf[RequestOptions]("FileCheckpointing")
+	systemPromptSnapshot = agent.EnumOf[RequestOptions]("SystemPromptSnapshot")
+)
 
 var (
 	namePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$`)
@@ -38,46 +43,46 @@ const (
 // Each field maps to one CLI flag; see docs/agents/claude-code.md.
 type RequestOptions struct {
 	// MaxTurns and MaxOutputTokens are optional native limits; omitted means the CLI's own.
-	MaxTurns                           int            `json:"max_turns,omitempty"`
-	MaxOutputTokens                    int            `json:"max_output_tokens,omitempty"`
-	AppendSystemPrompt                 string         `json:"append_system_prompt,omitempty"`
-	Agent                              string         `json:"agent,omitempty"`
-	Agents                             map[string]any `json:"agents,omitempty"`
-	Tools                              *[]string      `json:"tools,omitempty"`
-	AllowedTools                       []string       `json:"allowed_tools,omitempty"`
-	DisallowedTools                    []string       `json:"disallowed_tools,omitempty"`
-	PermissionMode                     string         `json:"permission_mode,omitempty"`
-	MaxBudgetUSD                       float64        `json:"max_budget_usd,omitempty"`
-	FallbackModel                      string         `json:"fallback_model,omitempty"`
-	FileCheckpointing                  string         `json:"file_checkpointing,omitempty"`
-	SessionName                        string         `json:"session_name,omitempty"`
-	IncludeHookEvents                  bool           `json:"include_hook_events,omitempty"`
-	ForwardSubagentText                bool           `json:"forward_subagent_text,omitempty"`
-	Autocompact                        string         `json:"autocompact,omitempty"`
-	DisableSlashCommands               bool           `json:"disable_slash_commands,omitempty"`
-	Debug                              bool           `json:"debug,omitempty"`
-	DebugFilter                        string         `json:"debug_filter,omitempty"`
-	Bare                               bool           `json:"bare,omitempty"`
-	SafeMode                           bool           `json:"safe_mode,omitempty"`
-	ExcludeDynamicSystemPromptSections bool           `json:"exclude_dynamic_system_prompt_sections,omitempty"`
-	PromptSuggestions                  bool           `json:"prompt_suggestions,omitempty"`
-	Brief                              bool           `json:"brief,omitempty"`
-	Betas                              []string       `json:"betas,omitempty"`
-	AllowDangerouslySkipPermissions    bool           `json:"allow_dangerously_skip_permissions,omitempty"`
+	MaxTurns                           int            `json:"max_turns,omitempty" doc:"Native --max-turns: 1 to 1000."`
+	MaxOutputTokens                    int            `json:"max_output_tokens,omitempty" doc:"CLAUDE_CODE_MAX_OUTPUT_TOKENS: 256 to 128000."`
+	AppendSystemPrompt                 string         `json:"append_system_prompt,omitempty" doc:"Native --append-system-prompt: text added to the system prompt."`
+	Agent                              string         `json:"agent,omitempty" doc:"Native --agent: the agent that runs the conversation."`
+	Agents                             map[string]any `json:"agents,omitempty" doc:"Native --agents: subagent definitions by name."`
+	Tools                              *[]string      `json:"tools,omitempty" doc:"Native --tools: the built-in tools available; [] disables all. Omitted: the CLI default set."`
+	AllowedTools                       []string       `json:"allowed_tools,omitempty" doc:"Native --allowed-tools."`
+	DisallowedTools                    []string       `json:"disallowed_tools,omitempty" doc:"Native --disallowed-tools."`
+	PermissionMode                     string         `json:"permission_mode,omitempty" enum:"acceptEdits,auto,dontAsk,manual,plan" doc:"Native --permission-mode; needs tools.permissions ask."`
+	MaxBudgetUSD                       float64        `json:"max_budget_usd,omitempty" doc:"Native --max-budget-usd."`
+	FallbackModel                      string         `json:"fallback_model,omitempty" doc:"Native --fallback-model: comma-separated model names. Without it no model fallback is allowed."`
+	FileCheckpointing                  string         `json:"file_checkpointing,omitempty" enum:"on,off" doc:"Native SDK file checkpoints; needs a workspace."`
+	SessionName                        string         `json:"session_name,omitempty" doc:"Native --name: display name of the session."`
+	IncludeHookEvents                  bool           `json:"include_hook_events,omitempty" doc:"Native --include-hook-events."`
+	ForwardSubagentText                bool           `json:"forward_subagent_text,omitempty" doc:"Native --forward-subagent-text."`
+	Autocompact                        string         `json:"autocompact,omitempty" doc:"Native --autocompact: auto, or a context size from 100k to 1M tokens."`
+	DisableSlashCommands               bool           `json:"disable_slash_commands,omitempty" doc:"Native --disable-slash-commands."`
+	Debug                              bool           `json:"debug,omitempty" doc:"Native --debug: bounded, redacted diagnostic events."`
+	DebugFilter                        string         `json:"debug_filter,omitempty" doc:"Native debug category filter; needs debug."`
+	Bare                               bool           `json:"bare,omitempty" doc:"Native --bare."`
+	SafeMode                           bool           `json:"safe_mode,omitempty" doc:"Native --safe-mode."`
+	ExcludeDynamicSystemPromptSections bool           `json:"exclude_dynamic_system_prompt_sections,omitempty" doc:"Native --exclude-dynamic-system-prompt-sections."`
+	PromptSuggestions                  bool           `json:"prompt_suggestions,omitempty" doc:"Native --prompt-suggestions."`
+	Brief                              bool           `json:"brief,omitempty" doc:"Native --brief."`
+	Betas                              []string       `json:"betas,omitempty" doc:"Native --betas."`
+	AllowDangerouslySkipPermissions    bool           `json:"allow_dangerously_skip_permissions,omitempty" doc:"Native --allow-dangerously-skip-permissions."`
 	// Files are Anthropic Files API resources downloaded into the workspace at startup
 	// ("file_id:relative/path").
-	Files []string `json:"files,omitempty"`
+	Files []string `json:"files,omitempty" doc:"Native --file: Anthropic Files API resources downloaded into the workspace, each as file_id:relative/path."`
 	// PluginDirs load plugins from directories inside an allowed root or the workspace.
-	PluginDirs []string `json:"plugin_dirs,omitempty"`
+	PluginDirs []string `json:"plugin_dirs,omitempty" doc:"Native --plugin-dir: directories inside an allowed root or the workspace."`
 	// PluginURLs load plugins from https URLs (zip archives).
-	PluginURLs           []string       `json:"plugin_urls,omitempty"`
-	MCPConfig            map[string]any `json:"mcp_config,omitempty"`
-	StrictMCPConfig      bool           `json:"strict_mcp_config,omitempty"`
-	SystemPromptSnapshot string         `json:"system_prompt_snapshot,omitempty"`
-	Settings             map[string]any `json:"settings,omitempty"`
+	PluginURLs           []string       `json:"plugin_urls,omitempty" doc:"Native --plugin-url: https URLs of zip archives."`
+	MCPConfig            map[string]any `json:"mcp_config,omitempty" doc:"Native --mcp-config: MCP server configuration."`
+	StrictMCPConfig      bool           `json:"strict_mcp_config,omitempty" doc:"Native --strict-mcp-config."`
+	SystemPromptSnapshot string         `json:"system_prompt_snapshot,omitempty" enum:"on,off" doc:"Native --system-prompt-snapshot."`
+	Settings             map[string]any `json:"settings,omitempty" doc:"Native --settings. The gateway policy is applied on top."`
 	// Initialize is sent as the control protocol "initialize" request before the first
 	// message (hooks and SDK MCP servers answered by the client, custom agents, ...).
-	Initialize map[string]any `json:"initialize,omitempty"`
+	Initialize map[string]any `json:"initialize,omitempty" doc:"The control protocol initialize request, sent before the first message (hooks, SDK MCP servers, custom agents)."`
 }
 
 // statelessOptions are the only options allowed without a workspace: none of them can
@@ -179,9 +184,9 @@ func (o *RequestOptions) validate(req *agent.Request) error {
 		return agent.Invalid("provider.permission_mode needs permissions ask (bypass always skips prompts)")
 	case o.PermissionMode != "" && !slices.Contains(PermissionModes, o.PermissionMode):
 		return agent.Invalid("provider.permission_mode must be one of %v", PermissionModes)
-	case o.SystemPromptSnapshot != "" && o.SystemPromptSnapshot != "on" && o.SystemPromptSnapshot != "off":
+	case o.SystemPromptSnapshot != "" && !slices.Contains(systemPromptSnapshot, o.SystemPromptSnapshot):
 		return agent.Invalid("provider.system_prompt_snapshot must be on or off")
-	case o.FileCheckpointing != "" && o.FileCheckpointing != "on" && o.FileCheckpointing != "off":
+	case o.FileCheckpointing != "" && !slices.Contains(fileCheckpointing, o.FileCheckpointing):
 		return agent.Invalid("provider.file_checkpointing must be on or off")
 	case req.Stateless() && o.FileCheckpointing == "on":
 		return agent.Invalid("provider.file_checkpointing needs a workspace")

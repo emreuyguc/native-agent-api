@@ -121,7 +121,7 @@ func (m *Manager) Start(opts Options) *Run {
 		r.early = nil
 		r.mu.Unlock()
 		log.Error("run failed to start", "err", err)
-		r.finish(StatusFailed, &ErrorInfo{Code: "agent_start_failed", Message: err.Error()}, opts.Finished)
+		r.finish(StatusFailed, &ErrorInfo{Code: ErrorAgentStartFailed, Message: err.Error()}, opts.Finished)
 		cancel(nil)
 		if opts.Release != nil {
 			opts.Release()
@@ -136,7 +136,7 @@ func (m *Manager) Start(opts Options) *Run {
 	if opts.Started != nil {
 		if r.nativeSessionID == "" {
 			r.mu.Unlock()
-			r.finish(StatusFailed, &ErrorInfo{Code: "native_session_missing", Message: "agent did not report a native session id"}, opts.Finished)
+			r.finish(StatusFailed, &ErrorInfo{Code: ErrorNativeSessionMissing, Message: "agent did not report a native session id"}, opts.Finished)
 			cancel(nil)
 			m.settleRejectedConversation(conv, opts.Release)
 
@@ -144,7 +144,7 @@ func (m *Manager) Start(opts Options) *Run {
 		}
 		if err := opts.Started(r.nativeSessionID); err != nil {
 			r.mu.Unlock()
-			r.finish(StatusFailed, &ErrorInfo{Code: "native_session_bind_failed", Message: "could not persist native session binding"}, opts.Finished)
+			r.finish(StatusFailed, &ErrorInfo{Code: ErrorNativeSessionBindFailed, Message: "could not persist native session binding"}, opts.Finished)
 			cancel(nil)
 			m.settleRejectedConversation(conv, opts.Release)
 
@@ -321,23 +321,23 @@ func (m *Manager) wait(ctx context.Context, r *Run, opts Options, log *slog.Logg
 	switch {
 	case errors.Is(cause, errTurnTimeout):
 		log.Warn("run timed out", "turn_timeout", opts.TurnTimeout)
-		r.finish(StatusFailed, &ErrorInfo{Code: "timeout", Message: "turn exceeded the configured timeout"}, opts.Finished)
+		r.finish(StatusFailed, &ErrorInfo{Code: ErrorTimeout, Message: "turn exceeded the configured timeout"}, opts.Finished)
 	case errors.Is(cause, errEventLimit):
 		log.Warn("run event limit reached", "max_events", opts.MaxEvents)
-		r.finish(StatusFailed, &ErrorInfo{Code: "event_limit", Message: "run exceeded the configured event limit"}, opts.Finished)
+		r.finish(StatusFailed, &ErrorInfo{Code: ErrorEventLimit, Message: "run exceeded the configured event limit"}, opts.Finished)
 	case cause != nil:
 		log.Info("run cancelled", "cause", cause)
-		r.finish(StatusCancelled, &ErrorInfo{Code: "cancelled", Message: cause.Error()}, opts.Finished)
+		r.finish(StatusCancelled, &ErrorInfo{Code: ErrorCancelled, Message: cause.Error()}, opts.Finished)
 	case err != nil:
-		r.finish(StatusFailed, &ErrorInfo{Code: "agent_run_failed", Message: redact.Message(err.Error(), maxErrorMessage)}, opts.Finished)
+		r.finish(StatusFailed, &ErrorInfo{Code: ErrorAgentRunFailed, Message: redact.Message(err.Error(), maxErrorMessage)}, opts.Finished)
 	case last == nil:
-		r.finish(StatusFailed, &ErrorInfo{Code: "agent_run_failed", Message: "agent exited without a result"}, opts.Finished)
+		r.finish(StatusFailed, &ErrorInfo{Code: ErrorAgentRunFailed, Message: "agent exited without a result"}, opts.Finished)
 	case !opts.Interactive && last.Failed():
 		message := last.Error
 		if message == "" {
 			message = fmt.Sprintf("agent turn ended: %s", last.Outcome)
 		}
-		r.finish(StatusFailed, &ErrorInfo{Code: "agent_run_failed", Message: message}, opts.Finished)
+		r.finish(StatusFailed, &ErrorInfo{Code: ErrorAgentRunFailed, Message: message}, opts.Finished)
 	default:
 		r.finish(StatusSucceeded, nil, opts.Finished)
 	}

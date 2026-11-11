@@ -31,8 +31,9 @@ explains behavior and policy.
 | ask without workspace | `--tools ""`, empty strict MCP config, no setting sources, `--no-session-persistence` |
 | `provider.max_turns` | `--max-turns` (1–1000) |
 | `provider.max_output_tokens` | `CLAUDE_CODE_MAX_OUTPUT_TOKENS` (256–128000) |
-| `provider.system_prompt_snapshot` | `--system-prompt-snapshot on\|off` |
-| `provider.file_checkpointing` | `on\|off`: native SDK file checkpoints for workspace runs |
+| `provider.system_prompt_snapshot` | `--system-prompt-snapshot`: `on` or `off` |
+| `provider.file_checkpointing` | Native SDK file checkpoints for workspace runs: `on` or `off` |
+| `provider.permission_mode` | `--permission-mode` with `tools.permissions: ask`: `acceptEdits`, `auto`, `dontAsk`, `manual` or `plan` |
 | `provider.debug`, `provider.debug_filter` | Bounded, redacted `diagnostic` events from stderr; the filter is the native debug category filter |
 
 The run `provider` section is `"name": "claude"` plus these options. Further options map the native

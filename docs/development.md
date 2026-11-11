@@ -1,6 +1,6 @@
 # Development
 
-Requirements: Go 1.27.3+, golangci-lint 2.15, and Docker for the container images.
+Requirements: Go 1.27.4+, golangci-lint 2.15, and Docker for the container images.
 
 ```sh
 make help

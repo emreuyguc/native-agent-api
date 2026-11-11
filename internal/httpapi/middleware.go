@@ -45,7 +45,7 @@ func requestID(next http.Handler) http.Handler {
 		w.Header().Set(requestIDHeader, id)
 		r = r.WithContext(logx.WithRequestID(r.Context(), id))
 		if !valid {
-			writeError(w, r, http.StatusBadRequest, "invalid_request_id",
+			writeError(w, r, http.StatusBadRequest, codeInvalidRequestID,
 				requestIDHeader+" must be 1 to 128 characters from A-Z a-z 0-9 . _ : / + = -")
 			return
 		}
@@ -76,7 +76,7 @@ func (s *Server) allowlist(next http.Handler) http.Handler {
 			addr, err := netip.ParseAddrPort(r.RemoteAddr)
 			if err != nil || !s.cfg.Network.Allows(addr.Addr()) {
 				s.log.WarnContext(r.Context(), "client address rejected by allowlist", "remote", r.RemoteAddr, "path", r.URL.Path)
-				writeError(w, r, http.StatusForbidden, "ip_not_allowed", "Client address is not allowed.")
+				writeError(w, r, http.StatusForbidden, codeIPNotAllowed, "Client address is not allowed.")
 				return
 			}
 		}
@@ -93,13 +93,13 @@ func (s *Server) browserGuard(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if checkHost && !literalHost(r.Host) {
 			s.log.WarnContext(r.Context(), "request host rejected", "host", r.Host, "path", r.URL.Path)
-			writeError(w, r, http.StatusForbidden, "host_not_allowed",
+			writeError(w, r, http.StatusForbidden, codeHostNotAllowed,
 				"Without a token the gateway must be addressed by IP address or localhost.")
 			return
 		}
 		if !safeMethod(r.Method) && crossOrigin(r) {
 			s.log.WarnContext(r.Context(), "cross-origin request rejected", "origin", r.Header.Get("Origin"), "path", r.URL.Path)
-			writeError(w, r, http.StatusForbidden, "cross_origin_request", "Cross-origin requests are not allowed.")
+			writeError(w, r, http.StatusForbidden, codeCrossOriginRequest, "Cross-origin requests are not allowed.")
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -160,7 +160,7 @@ func (s *Server) authenticate(next http.Handler, public map[string]bool) http.Ha
 		digest := sha256.Sum256([]byte(provided))
 		if !ok || subtle.ConstantTimeCompare(digest[:], expected[:]) != 1 {
 			s.log.WarnContext(r.Context(), "authentication failed", "remote", r.RemoteAddr, "path", r.URL.Path, "bearer", ok)
-			writeError(w, r, http.StatusUnauthorized, "unauthorized", "A valid bearer token is required.")
+			writeError(w, r, http.StatusUnauthorized, codeUnauthorized, "A valid bearer token is required.")
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -225,7 +225,7 @@ func (s *Server) recoverPanics(next http.Handler) http.Handler {
 					panic(recovered)
 				}
 				s.log.ErrorContext(ctx, "handler panic", slog.Any("panic", recovered), slog.String("path", r.URL.Path))
-				writeError(w, r, http.StatusInternalServerError, "internal_error", "Internal server error.")
+				writeError(w, r, http.StatusInternalServerError, codeInternalError, "Internal server error.")
 			}
 		}()
 		next.ServeHTTP(w, r)

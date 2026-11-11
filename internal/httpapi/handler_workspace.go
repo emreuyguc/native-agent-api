@@ -34,7 +34,7 @@ func (s *Server) createWorkspace(ctx context.Context, _ *struct{}) (*body[worksp
 	id, err := s.workspaces.Create()
 	if err != nil {
 		s.log.ErrorContext(ctx, "create workspace", "err", err)
-		return nil, fail(http.StatusInternalServerError, "workspace_create_failed", "Unable to create workspace.")
+		return nil, fail(http.StatusInternalServerError, codeWorkspaceCreateFailed, "Unable to create workspace.")
 	}
 	s.log.InfoContext(ctx, "workspace created", "workspace_id", id)
 	info, err := s.workspaces.Info(id)
@@ -68,13 +68,13 @@ func (s *Server) attachWorkspace(ctx context.Context, in *attachWorkspaceInput) 
 	info, err := s.workspaces.AttachHostDirectory(in.Body.Path)
 	switch {
 	case errors.Is(err, workspace.ErrAttachmentDisabled):
-		return nil, fail(http.StatusForbidden, "attachment_disabled", "Host-directory attachments need NATIVE_AGENT_ALLOWED_ROOTS.")
+		return nil, fail(http.StatusForbidden, codeAttachmentDisabled, "Host-directory attachments need NATIVE_AGENT_ALLOWED_ROOTS.")
 	case errors.Is(err, workspace.ErrInvalidPath):
 		s.log.WarnContext(ctx, "workspace attachment refused", "path", in.Body.Path, "err", err)
-		return nil, fail(http.StatusForbidden, "path_not_allowed", "The path is not a directory inside an allowed root.")
+		return nil, fail(http.StatusForbidden, codePathNotAllowed, "The path is not a directory inside an allowed root.")
 	case err != nil:
 		s.log.ErrorContext(ctx, "attach host directory", "err", err)
-		return nil, fail(http.StatusInternalServerError, "workspace_attach_failed", "Unable to attach host directory.")
+		return nil, fail(http.StatusInternalServerError, codeWorkspaceAttachFailed, "Unable to attach host directory.")
 	}
 	s.log.InfoContext(ctx, "host directory attached", "workspace_id", info.ID, "path", info.Attachment.Path)
 
@@ -87,7 +87,7 @@ func (s *Server) listWorkspaces(ctx context.Context, input *workspaceListInput) 
 	infos, err := s.workspaces.Workspaces()
 	if err != nil {
 		s.log.ErrorContext(ctx, "list workspaces", "err", err)
-		return nil, fail(http.StatusInternalServerError, "workspace_list_failed", "Unable to list workspaces.")
+		return nil, fail(http.StatusInternalServerError, codeWorkspaceListFailed, "Unable to list workspaces.")
 	}
 
 	return page(s.withLastUsed(infos...), input.PageInput, func(item workspace.Info) string { return item.ID })
@@ -116,13 +116,13 @@ func (s *Server) removeWorkspace(storage, action string) func(context.Context, *
 			if info.Storage == "managed" {
 				hint = "delete"
 			}
-			return nil, fail(http.StatusConflict, "wrong_workspace_storage",
+			return nil, fail(http.StatusConflict, codeWrongWorkspaceStorage,
 				"The workspace has "+info.Storage+" storage; use /v1/workspaces/{workspace_id}/"+hint+".")
 		}
 		err = s.sessions.RemoveIfIdle(id, func() error { return s.workspaces.Remove(id) })
 		if errors.Is(err, session.ErrBusy) {
 			s.log.WarnContext(ctx, "workspace "+action+" refused: active session", "workspace_id", id)
-			return nil, fail(http.StatusConflict, "workspace_busy", "Workspace has an active session.")
+			return nil, fail(http.StatusConflict, codeWorkspaceBusy, "Workspace has an active session.")
 		}
 		if err != nil {
 			return nil, s.workspaceError(ctx, err)
@@ -146,7 +146,7 @@ type sessionListInput struct {
 
 func (s *Server) listSessions(_ context.Context, in *sessionListInput) (*body[list[session.View]], error) {
 	if in.WorkspaceID != "" && !ids.ValidWorkspaceID(in.WorkspaceID) {
-		return nil, fail(http.StatusUnprocessableEntity, "invalid_workspace", "workspace_id is invalid.")
+		return nil, fail(http.StatusUnprocessableEntity, codeInvalidWorkspace, "workspace_id is invalid.")
 	}
 
 	all := s.sessions.List(in.WorkspaceID)
@@ -182,18 +182,18 @@ func (s *Server) sessionError(ctx context.Context, err error) error {
 	s.log.DebugContext(ctx, "session request rejected", "err", err)
 	switch {
 	case errors.Is(err, session.ErrNotFound):
-		return fail(http.StatusNotFound, "session_not_found", err.Error())
+		return fail(http.StatusNotFound, codeSessionNotFound, err.Error())
 	case errors.Is(err, session.ErrBusy):
-		return fail(http.StatusConflict, "session_busy", "An active session cannot be deleted.")
+		return fail(http.StatusConflict, codeSessionBusy, "An active session cannot be deleted.")
 	case errors.Is(err, session.ErrInvalid):
-		return fail(http.StatusUnprocessableEntity, "invalid_session", err.Error())
+		return fail(http.StatusUnprocessableEntity, codeInvalidSession, err.Error())
 	case errors.Is(err, session.ErrNotStarted):
-		return fail(http.StatusConflict, "session_not_started", "The session has no native conversation to fork yet.")
+		return fail(http.StatusConflict, codeSessionNotStarted, "The session has no native conversation to fork yet.")
 	case errors.Is(err, session.ErrExists):
-		return fail(http.StatusConflict, "session_exists", err.Error())
+		return fail(http.StatusConflict, codeSessionExists, err.Error())
 	default:
 		s.log.ErrorContext(ctx, "session operation failed", "err", err)
-		return fail(http.StatusInternalServerError, "session_error", "Session operation failed.")
+		return fail(http.StatusInternalServerError, codeSessionError, "Session operation failed.")
 	}
 }
 
@@ -228,7 +228,7 @@ func (u *uploadInput) Resolve(ctx huma.Context) []error {
 func (s *Server) uploadFile(ctx context.Context, in *uploadInput) (*body[workspace.UploadedFile], error) {
 	limit := s.cfg.Limits.MaxFileBytes
 	if in.length > limit {
-		return nil, fail(http.StatusRequestEntityTooLarge, "file_too_large", workspace.ErrFileTooLarge.Error())
+		return nil, fail(http.StatusRequestEntityTooLarge, codeFileTooLarge, workspace.ErrFileTooLarge.Error())
 	}
 	// One byte over the limit lets the store detect oversized bodies without Content-Length.
 	file, err := s.workspaces.Upload(in.WorkspaceID, in.Path, io.LimitReader(in.body, limit+1))
@@ -319,20 +319,20 @@ func (s *Server) workspaceError(ctx context.Context, err error) error {
 	s.log.DebugContext(ctx, "workspace request rejected", "err", err)
 	switch {
 	case errors.Is(err, workspace.ErrInvalidID), errors.Is(err, workspace.ErrNotFound):
-		return fail(http.StatusNotFound, "not_found", err.Error())
+		return fail(http.StatusNotFound, codeNotFound, err.Error())
 	case errors.Is(err, workspace.ErrInvalidPath), errors.Is(err, workspace.ErrIsDirectory):
-		return fail(http.StatusUnprocessableEntity, "invalid_path", err.Error())
+		return fail(http.StatusUnprocessableEntity, codeInvalidPath, err.Error())
 	case errors.Is(err, workspace.ErrInvalidOperation):
-		return fail(http.StatusUnprocessableEntity, "invalid_operation", err.Error())
+		return fail(http.StatusUnprocessableEntity, codeInvalidOperation, err.Error())
 	case errors.Is(err, workspace.ErrPathConflict):
-		return fail(http.StatusConflict, "path_conflict", err.Error())
+		return fail(http.StatusConflict, codePathConflict, err.Error())
 	case errors.Is(err, workspace.ErrFileTooLarge):
-		return fail(http.StatusRequestEntityTooLarge, "file_too_large", err.Error())
+		return fail(http.StatusRequestEntityTooLarge, codeFileTooLarge, err.Error())
 	case errors.Is(err, workspace.ErrTooManyEntries):
-		return fail(http.StatusUnprocessableEntity, "too_many_entries", err.Error())
+		return fail(http.StatusUnprocessableEntity, codeTooManyEntries, err.Error())
 	default:
 		s.log.ErrorContext(ctx, "workspace operation failed", slog.Any("err", err))
-		return fail(http.StatusInternalServerError, "workspace_error", "Workspace operation failed.")
+		return fail(http.StatusInternalServerError, codeWorkspaceError, "Workspace operation failed.")
 	}
 }
 

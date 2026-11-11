@@ -53,7 +53,7 @@ var _ agent.Agent = (*Agent)(nil)
 func (*Agent) Info() agent.Info {
 	return agent.Info{
 		Name: "fake", Title: "Fake CLI", Provider: "Test", Binary: "fake",
-		Capabilities: []agent.Capability{}, LoginMethods: []string{}, TestedVersion: "1.0.0", Docs: "none",
+		Capabilities: []agent.Capability{}, LoginMethods: []string{"browser"}, TestedVersion: "1.0.0", Docs: "none",
 	}
 }
 

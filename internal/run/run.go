@@ -12,6 +12,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"maps"
 	"slices"
 	"sync"
 	"time"
@@ -92,9 +93,39 @@ type Event struct {
 
 // ErrorInfo says why a run failed or was cancelled.
 type ErrorInfo struct {
-	Code    string `json:"code"    doc:"Stable code: cancelled, timeout, event_limit, agent_run_failed, agent_start_failed, native_session_missing, native_session_bind_failed."`
-	Message string `json:"message"`
+	Code    ErrorCode `json:"code"    doc:"Stable code."`
+	Message string    `json:"message"`
 }
+
+// ErrorCode is a stable ErrorInfo code.
+type ErrorCode string
+
+// Run error codes. The API document and docs/api.md list them with their meaning.
+const (
+	ErrorAgentRunFailed          ErrorCode = "agent_run_failed"
+	ErrorAgentStartFailed        ErrorCode = "agent_start_failed"
+	ErrorCancelled               ErrorCode = "cancelled"
+	ErrorEventLimit              ErrorCode = "event_limit"
+	ErrorNativeSessionBindFailed ErrorCode = "native_session_bind_failed"
+	ErrorNativeSessionMissing    ErrorCode = "native_session_missing"
+	ErrorTimeout                 ErrorCode = "timeout"
+)
+
+var errorCodeMeanings = map[ErrorCode]string{
+	ErrorAgentRunFailed:          "The CLI failed during the turn or exited without a result",
+	ErrorAgentStartFailed:        "The CLI did not start",
+	ErrorCancelled:               "A client cancelled the run",
+	ErrorEventLimit:              "The run exceeded NATIVE_AGENT_MAX_RUN_EVENTS",
+	ErrorNativeSessionBindFailed: "The native session ID could not be stored",
+	ErrorNativeSessionMissing:    "The CLI did not report a native session ID",
+	ErrorTimeout:                 "The turn exceeded NATIVE_AGENT_QUERY_TIMEOUT_SECONDS",
+}
+
+// ErrorCodes returns every run error code, sorted.
+func ErrorCodes() []ErrorCode { return slices.Sorted(maps.Keys(errorCodeMeanings)) }
+
+// Meaning describes the code, or returns "" for an unknown value.
+func (c ErrorCode) Meaning() string { return errorCodeMeanings[c] }
 
 // TurnInfo is the payload of an EventTurn.
 type TurnInfo struct {

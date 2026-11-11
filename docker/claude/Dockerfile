@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1.7
 #
 # Claude Code Docker image: native-agent-api + the native Claude Code CLI (pinned version + SHA-256).
-# Built through docker/compose.claude.yaml, which passes the pinned base images and the build
-# identity from docker/.env (see docker/README.md).
+# Built through docker/compose.yaml with CONTAINER_AGENT=claude, which passes the pinned base images
+# and the build identity from the Docker env file (see docker/README.md).
 
 ARG GO_IMAGE
 ARG RUNTIME_IMAGE

@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900" role="img" aria-labelledby="title desc">
+  <title id="title">native-agent-api with two Docker containers and one shared workspace</title>
+  <desc id="desc">Two native-agent-api containers run Claude Code and Codex CLI separately. Both expose the same HTTP API, use their native capabilities and work in one shared project directory.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#070b12"/><stop offset="0.55" stop-color="#0d1421"/><stop offset="1" stop-color="#080d16"/></linearGradient>
+    <linearGradient id="claude" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d97757"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient>
+    <linearGradient id="codex" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#10a37f"/><stop offset="1" stop-color="#06b6d4"/></linearGradient>
+    <linearGradient id="timeline" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#8b5cf6" stop-opacity="0"/><stop offset="0.5" stop-color="#60a5fa"/><stop offset="1" stop-color="#10b981" stop-opacity="0"/></linearGradient>
+    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="wideGlow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="18" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <style>
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Helvetica, Arial, sans-serif; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .eyebrow { fill:#8b9bb0; font-size:14px; font-weight:700; letter-spacing:2.5px; }
+    .headline { fill:#f1f5f9; font-size:42px; font-weight:740; letter-spacing:-1.2px; }
+    .subtitle { fill:#94a3b8; font-size:18px; }
+    .card { fill:#0f1724; stroke:#2a384d; stroke-width:1.5; }
+    .cardTitle { fill:#f1f5f9; font-size:20px; font-weight:680; }
+    .text { fill:#91a0b5; font-size:14px; }
+    .small { fill:#75869e; font-size:12px; }
+    .label { fill:#9eacc0; font-size:12px; font-weight:700; letter-spacing:.7px; }
+    .chip { fill:#111b2a; stroke:#314159; stroke-width:1.2; }
+    .chipText { fill:#dce7f5; font-size:12px; font-weight:680; text-anchor:middle; }
+    .track { fill:none; stroke:#263348; stroke-width:3; stroke-linecap:round; }
+    .trackSoft { fill:none; stroke:#304059; stroke-width:2; stroke-dasharray:5 8; }
+    .packet { opacity:0; filter:url(#glow); }
+    .claudeHalo { opacity:.08; animation:claudeHalo 12s ease-in-out infinite; }
+    .codexHalo { opacity:.08; animation:codexHalo 12s ease-in-out infinite; }
+    .workspace { animation:workspace 12s ease-in-out infinite; }
+    .job { animation:job 12s ease-in-out infinite; }
+    .cap { animation:cap 12s ease-in-out infinite; }
+    .cap.c1 { animation-delay:2s; } .cap.c2 { animation-delay:1.5s; } .cap.c3 { animation-delay:1s; } .cap.c4 { animation-delay:.5s; }
+    .toClaude { offset-path:path("M300 360 L450 360"); animation:toClaude 12s linear infinite; }
+    .toCodex { offset-path:path("M300 330 C500 135 850 135 1030 330"); animation:toCodex 12s linear infinite; }
+    .claudeEvent { offset-path:path("M450 420 L300 420"); animation:claudeEvent 12s linear infinite; }
+    .codexEvent { offset-path:path("M1030 390 C820 600 500 600 300 450"); animation:codexEvent 12s linear infinite; }
+    .workA { offset-path:path("M670 590 L670 625 L850 625"); animation:workA 12s linear infinite; }
+    .workB { offset-path:path("M1250 590 L1250 625 L1090 625"); animation:workB 12s linear infinite; }
+    .capPacket { offset-path:path("M1250 590 L1250 742 L202 742"); animation:capPacket 12s ease-in-out infinite; }
+    .progress { transform-origin:80px 858px; animation:progress 12s linear infinite; }
+    @keyframes claudeHalo { 0%,6%,42%,100%{opacity:.08} 12%,32%{opacity:.7} }
+    @keyframes codexHalo { 0%,14%,50%,100%{opacity:.08} 23%,40%{opacity:.7} }
+    @keyframes workspace { 0%,30%,61%,100%{fill:#0f1724;stroke:#2a384d} 38%,55%{fill:#10231d;stroke:#22c55e} }
+    @keyframes job { 0%,62%,100%{fill:#101927;stroke:#314159} 70%,92%{fill:#101f32;stroke:#60a5fa} }
+    @keyframes cap { 0%,34%,47%,100%{fill:#111b2a;stroke:#314159;transform:translateY(0)} 38%,42%{fill:#19182f;stroke:#8b5cf6;transform:translateY(-5px)} }
+    @keyframes toClaude { 0%,5%{opacity:0;offset-distance:0%} 7%{opacity:1} 16%{opacity:1} 18%,100%{opacity:0;offset-distance:100%} }
+    @keyframes toCodex { 0%,15%{opacity:0;offset-distance:0%} 17%{opacity:1} 29%{opacity:1} 31%,100%{opacity:0;offset-distance:100%} }
+    @keyframes workA { 0%,31%{opacity:0;offset-distance:0%} 34%{opacity:1} 44%{opacity:1} 47%,100%{opacity:0;offset-distance:100%} }
+    @keyframes workB { 0%,38%{opacity:0;offset-distance:0%} 41%{opacity:1} 51%{opacity:1} 54%,100%{opacity:0;offset-distance:100%} }
+    @keyframes capPacket { 0%,31%{opacity:0;offset-distance:0%} 35%{opacity:1} 58%{opacity:1} 62%,100%{opacity:0;offset-distance:100%} }
+    @keyframes claudeEvent { 0%,59%{opacity:0;offset-distance:0%} 62%{opacity:1} 72%{opacity:1} 75%,100%{opacity:0;offset-distance:100%} }
+    @keyframes codexEvent { 0%,66%{opacity:0;offset-distance:0%} 69%{opacity:1} 81%{opacity:1} 84%,100%{opacity:0;offset-distance:100%} }
+    @keyframes progress { from{transform:scaleX(0)} to{transform:scaleX(1)} }
+    @media (prefers-reduced-motion:reduce){.claudeHalo,.codexHalo,.workspace,.job,.cap,.packet,.progress{animation:none}}
+  </style>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <circle cx="740" cy="400" r="430" fill="#3b82f6" opacity=".025"/><circle cx="1250" cy="380" r="340" fill="#10b981" opacity=".02"/>
+  <text class="eyebrow" x="80" y="62">TWO NATIVE AGENTS · ONE SHARED WORKSPACE</text>
+  <text class="headline" x="80" y="112">native-agent-api</text>
+  <text class="subtitle" x="80" y="148">The same HTTP interface for Claude Code and Codex CLI</text>
+  <rect x="1190" y="75" width="330" height="58" rx="18" fill="#101927" stroke="#2a384d"/>
+  <text class="label" x="1215" y="99">COMMON CONTRACT</text><text class="small mono" x="1215" y="120">REST · SSE · WebSocket</text>
+
+  <!-- Client applications -->
+  <rect class="card" x="70" y="295" width="230" height="190" rx="24"/>
+  <circle cx="108" cy="334" r="17" fill="#17243a" stroke="#60a5fa"/><path d="M101 334h14M108 327v14" stroke="#93c5fd" stroke-width="2" stroke-linecap="round"/>
+  <text class="cardTitle" x="96" y="378">Your applications</text>
+  <text class="text" x="96" y="410">Web · mobile · scripts</text><text class="text" x="96" y="436">services · internal tools</text>
+  <rect x="96" y="451" width="118" height="22" rx="11" fill="#13213a"/><text class="small mono" x="155" y="466" text-anchor="middle" fill="#93c5fd">HTTP client</text>
+
+  <!-- Claude container -->
+  <rect x="420" y="190" width="500" height="400" rx="30" fill="#0a111d" fill-opacity=".48" stroke="#5b4561" stroke-width="1.5" stroke-dasharray="8 10"/>
+  <rect x="450" y="174" width="180" height="31" rx="15" fill="#241820" stroke="#754a5c"/><text class="chipText" x="540" y="194">Docker container 01</text>
+  <rect class="claudeHalo" x="438" y="230" width="464" height="280" rx="30" fill="url(#claude)" filter="url(#wideGlow)"/>
+  <rect class="card" x="450" y="242" width="440" height="256" rx="24" stroke="url(#claude)" stroke-width="2.5"/>
+  <text class="label" x="480" y="279">NATIVE-AGENT-API</text><text class="small" x="856" y="279" text-anchor="end">one agent process</text>
+  <text class="cardTitle" x="480" y="315">Claude Code</text>
+  <rect x="480" y="337" width="118" height="34" rx="12" fill="#21171a" stroke="#d97757"/><text class="chipText mono" x="539" y="359" fill="#f0a58a">claude</text>
+  <text class="text" x="620" y="359">native CLI runtime</text>
+  <rect class="chip" x="480" y="390" width="84" height="28" rx="14"/><rect class="chip" x="574" y="390" width="84" height="28" rx="14"/><rect class="chip" x="668" y="390" width="118" height="28" rx="14"/>
+  <text class="chipText mono" x="522" y="409">REST</text><text class="chipText mono" x="616" y="409">SSE</text><text class="chipText mono" x="727" y="409">WebSocket</text>
+  <circle cx="485" cy="452" r="7" fill="#f59e0b"/><text class="small" x="500" y="456">Claude subscription or API billing</text>
+  <rect class="job" x="450" y="518" width="440" height="52" rx="16" stroke-width="1.5"/><circle cx="476" cy="544" r="6" fill="#60a5fa"/><text class="label" x="490" y="548">BACKGROUND RUNS</text><text class="small" x="856" y="548" text-anchor="end">continue · fork · cancel</text>
+
+  <!-- Codex container -->
+  <rect x="1000" y="190" width="500" height="400" rx="30" fill="#0a111d" fill-opacity=".48" stroke="#285e58" stroke-width="1.5" stroke-dasharray="8 10"/>
+  <rect x="1030" y="174" width="180" height="31" rx="15" fill="#10241f" stroke="#276a5b"/><text class="chipText" x="1120" y="194">Docker container 02</text>
+  <rect class="codexHalo" x="1018" y="230" width="464" height="280" rx="30" fill="url(#codex)" filter="url(#wideGlow)"/>
+  <rect class="card" x="1030" y="242" width="440" height="256" rx="24" stroke="url(#codex)" stroke-width="2.5"/>
+  <text class="label" x="1060" y="279">NATIVE-AGENT-API</text><text class="small" x="1436" y="279" text-anchor="end">one agent process</text>
+  <text class="cardTitle" x="1060" y="315">Codex CLI</text>
+  <rect x="1060" y="337" width="118" height="34" rx="12" fill="#101f1e" stroke="#10a37f"/><text class="chipText mono" x="1119" y="359" fill="#6ee7b7">codex</text>
+  <text class="text" x="1200" y="359">native app-server runtime</text>
+  <rect class="chip" x="1060" y="390" width="84" height="28" rx="14"/><rect class="chip" x="1154" y="390" width="84" height="28" rx="14"/><rect class="chip" x="1248" y="390" width="118" height="28" rx="14"/>
+  <text class="chipText mono" x="1102" y="409">REST</text><text class="chipText mono" x="1196" y="409">SSE</text><text class="chipText mono" x="1307" y="409">WebSocket</text>
+  <circle cx="1065" cy="452" r="7" fill="#f59e0b"/><text class="small" x="1080" y="456">ChatGPT subscription or API billing</text>
+  <rect class="job" x="1030" y="518" width="440" height="52" rx="16" stroke-width="1.5"/><circle cx="1056" cy="544" r="6" fill="#60a5fa"/><text class="label" x="1070" y="548">BACKGROUND RUNS</text><text class="small" x="1436" y="548" text-anchor="end">continue · fork · cancel</text>
+
+  <!-- Shared workspace -->
+  <path class="trackSoft" d="M670 590V625H850M1250 590V625H1090"/>
+  <rect class="workspace" x="620" y="615" width="700" height="96" rx="22" stroke-width="1.7"/>
+  <path d="M660 648h30l10 10h48v33h-88z" fill="#15263a" stroke="#60a5fa" stroke-width="1.5"/>
+  <text class="label" x="775" y="649">ONE SHARED WORK DIRECTORY</text><text class="cardTitle" x="775" y="680">Both agents work on the same project files</text>
+  <text class="small" x="775" y="701">mounted volume · attached directory</text>
+
+  <!-- Request and event tracks -->
+  <path class="track" d="M300 360H450"/><path class="trackSoft" d="M300 330C500 135 850 135 1030 330"/>
+  <path class="track" d="M450 420H300"/><path class="trackSoft" d="M1030 390C820 600 500 600 300 450"/>
+  <circle class="packet toClaude" r="8" fill="#d97757"/><circle class="packet toCodex" r="8" fill="#10b981"/>
+  <circle class="packet workA" r="7" fill="#4ade80"/><circle class="packet workB" r="7" fill="#4ade80"/>
+  <circle class="packet claudeEvent" r="7" fill="#a78bfa"/><circle class="packet codexEvent" r="7" fill="#60a5fa"/>
+
+  <!-- Native capability bus -->
+  <path class="trackSoft" d="M670 590V742H202M1250 590V742"/>
+  <circle class="packet capPacket" r="7" fill="#a78bfa"/>
+  <text class="eyebrow" x="80" y="735">EACH CLI DISCOVERS AND RUNS ITS NATIVE CAPABILITIES</text>
+  <g class="cap c1"><rect x="80" y="760" width="244" height="66" rx="18" stroke-width="1.5"/><text class="chipText" x="202" y="788">TOOLS</text><text class="small" x="202" y="811" text-anchor="middle">execute</text></g>
+  <g class="cap c2"><rect x="342" y="760" width="244" height="66" rx="18" stroke-width="1.5"/><text class="chipText" x="464" y="788">SKILLS</text><text class="small" x="464" y="811" text-anchor="middle">discover &amp; load</text></g>
+  <g class="cap c3"><rect x="604" y="760" width="244" height="66" rx="18" stroke-width="1.5"/><text class="chipText" x="726" y="788">HOOKS</text><text class="small" x="726" y="811" text-anchor="middle">trigger</text></g>
+  <g class="cap c4"><rect x="866" y="760" width="244" height="66" rx="18" stroke-width="1.5"/><text class="chipText" x="988" y="788">PLUGINS</text><text class="small" x="988" y="811" text-anchor="middle">extend</text></g>
+  <g class="cap c5"><rect x="1128" y="760" width="244" height="66" rx="18" stroke-width="1.5"/><text class="chipText" x="1250" y="788">MCP SERVERS</text><text class="small" x="1250" y="811" text-anchor="middle">connect</text></g>
+  <rect x="1390" y="760" width="130" height="66" rx="18" fill="#101927" stroke="#314159"/><text class="chipText" x="1455" y="788">PERMISSIONS</text><text class="small" x="1455" y="811" text-anchor="middle">client controlled</text>
+
+  <rect x="80" y="858" width="1440" height="4" rx="2" fill="#1b2738"/><rect class="progress" x="80" y="858" width="1440" height="4" rx="2" fill="url(#timeline)"/>
+  <text class="small" x="80" y="884">one process · one agent</text><text class="small" x="1520" y="884" text-anchor="end">shared files · native behavior · live events</text>
+</svg>

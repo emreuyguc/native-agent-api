@@ -17,9 +17,10 @@
 .vscode/
 *.swp
 
-# Local Compose settings
-/docker/.env
-
 # Local planning notes (not committed)
 /TODO.md
 /acceptance-results/
+
+/.scratch/
+# Local Docker installations (env files contain the token digest)
+/docker/*.env
