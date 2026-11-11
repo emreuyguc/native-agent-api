@@ -38,14 +38,17 @@ jobs:
         with:
           version: ${{ steps.golangci-lint.outputs.version }}
           install-only: true
-      # The same target as the pre-commit hook; docs/development.md lists every target.
+      # The targets of the pre-commit hook and the Docker-based checks, three at a time; each
+      # target's output stays together. docs/development.md lists every target.
       # -shuffle=on finds tests that depend on their order; locally it would disable the test cache.
-      - run: make check-pre-commit GOLANGCI_LINT=golangci-lint TESTFLAGS="-count=1 -shuffle=on"
+      - run: >-
+          make -j3 --output-sync=target
+          check-pre-commit lint-scripts lint-dockerfiles check-release-config
+          GOLANGCI_LINT=golangci-lint TESTFLAGS="-count=1 -shuffle=on"
       - name: Coverage in the run summary
         if: ${{ !cancelled() && hashFiles('coverage.txt') != '' }}
         run: |
           { echo '```'; cat coverage.txt; echo '```'; } >>"$GITHUB_STEP_SUMMARY"
-      - run: make lint-scripts lint-dockerfiles check-release-config
 
   # The release ships darwin binaries; process groups, the process table and os.Root differ there.
   macos:
@@ -83,49 +86,46 @@ jobs:
         with:
           fail-on-severity: high
 
-  # `make build-images` builds the same Dockerfiles locally. Here the action keeps a BuildKit cache
-  # per image in GitHub, and the jobs start without waiting for `check`.
+  # `make build-images` builds the same Dockerfiles locally. Here each architecture builds on its
+  # own native runner, without QEMU, with a BuildKit cache per image and architecture in GitHub.
+  # The jobs start without waiting for `check`. The amd64 jobs keep the names `docker (<image>)`
+  # that the ruleset requires.
   docker:
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    name: docker (${{ matrix.image }}${{ matrix.arch == 'arm64' && ', arm64' || '' }})
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         image: [claude, codex, edge]
+        arch: [amd64, arm64]
+    env:
+      # An agent image on amd64 is loaded into Docker, then smoke-tested and scanned.
+      TEST: ${{ matrix.arch == 'amd64' && matrix.image != 'edge' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      - name: Build ${{ matrix.image }} image (amd64 + arm64)
+      # The image to test rebuilds its runtime stage without the cache, so its Alpine packages are
+      # current for the scan; the Go build and the CLI download come from the cache.
+      - name: Build ${{ matrix.image }} image (${{ matrix.arch }})
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: docker/${{ matrix.image }}/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: false
-          cache-from: type=gha,scope=${{ matrix.image }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+          platforms: linux/${{ matrix.arch }}
+          load: ${{ env.TEST == 'true' }}
+          tags: ${{ env.TEST == 'true' && format('native-agent-api-imagetest-{0}:local', matrix.image) || '' }}
+          no-cache-filters: ${{ env.TEST == 'true' && 'runtime' || '' }}
+          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.arch }}
       # An agent image must start hardened and healthy without a login, and its packages must have
       # no fixed high or critical vulnerability. The edge image is scanned weekly (scan.yml).
-      # The amd64 image comes from the cache of the build above. Only the runtime stage is built
-      # again, so its Alpine packages are current for the scan.
-      - name: Load ${{ matrix.image }} image (amd64)
-        if: matrix.image != 'edge'
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          file: docker/${{ matrix.image }}/Dockerfile
-          platforms: linux/amd64
-          load: true
-          tags: native-agent-api-imagetest-${{ matrix.image }}:local
-          cache-from: type=gha,scope=${{ matrix.image }}
-          no-cache-filters: runtime
-      - name: Smoke test ${{ matrix.image }} image (amd64)
-        if: matrix.image != 'edge'
+      - name: Smoke test ${{ matrix.image }} image
+        if: env.TEST == 'true'
         run: make test-image AGENT=${{ matrix.image }} NO_BUILD=1
       - name: Scan ${{ matrix.image }} image
-        if: matrix.image != 'edge'
+        if: env.TEST == 'true'
         run: make scan-images SCAN=native-agent-api-imagetest-${{ matrix.image }}:local
