@@ -24,13 +24,37 @@ jobs:
         run: |
           go mod tidy -diff
           go mod verify
+          cd tools && go mod tidy -diff && go mod verify
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: v2.15.0
+      - name: Check workflows
+        run: make lint-workflows
       - name: Test
         run: go test -race -count=1 -coverprofile=coverage.out ./...
       - name: Vulnerability scan
         run: go tool govulncheck ./...
+
+  # zizmor finds unsafe patterns in the workflows: injection, token exposure, cache poisoning.
+  workflows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zizmorcore/zizmor-action@85b2b9fb8e3325e7a23d7d0a9d7ba5ae0f999e3e # v0.7.1
+        with:
+          version: 1.31.1
+          advanced-security: false
+
+  # A pull request may not add a dependency with a known high or critical vulnerability.
+  dependencies:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
 
   docker:
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}

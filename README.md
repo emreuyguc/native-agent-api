@@ -1,6 +1,7 @@
 # native-agent-api
 
 [![CI](https://github.com/emreuyguc/native-agent-api/actions/workflows/ci.yml/badge.svg)](https://github.com/emreuyguc/native-agent-api/actions/workflows/ci.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/emreuyguc/native-agent-api/badge)](https://scorecard.dev/viewer/?uri=github.com/emreuyguc/native-agent-api)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 **An HTTP API for Claude Code and Codex CLI.** native-agent-api runs the real coding-agent CLI and

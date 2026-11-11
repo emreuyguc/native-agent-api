@@ -60,7 +60,7 @@ other need separate gateways.
 | Filesystem | Paths reject absolute, `..`, NUL, backslash and symlinks; every operation runs on an `os.Root`; only single-link regular files are opened, without blocking; atomic uploads; entry limits on delete and copy |
 | Native options | Strict per-adapter schemas; gateway-owned keys (sandbox, approval, config paths) rejected. Plugins, MCP, hooks and native controls act with the client's authority, which already includes starting commands. The agent cannot call them: the CLI sandbox blocks loopback to the gateway |
 | Secrets in output | Tokens redacted in errors and debug output; body logging off by default, never for file transfers or login |
-| Releases | Binaries and images built only by the release workflow from a version tag after the checks; signed build provenance (Sigstore), SBOM and checksums; pinned actions and base images |
+| Supply chain | Binaries and images built only by the release workflow from a version tag after the checks; signed build provenance (Sigstore), SBOM and checksums; pinned actions and base images. Workflows checked by actionlint and zizmor; pull requests cannot add a dependency with a known high vulnerability; OpenSSF Scorecard weekly |
 | Container | Non-root UID, read-only root filesystem, no capabilities, `no-new-privileges`, PID limit, bounded tmpfs, pinned CLI checksums. The container gets only the application env file, never the Docker env file (`docker/verify.sh` checks it). Optional egress overlay: no route or external DNS, only allowlisted hosts through a proxy |
 
 ## Protections with regression tests

@@ -32,16 +32,21 @@ test-host: ## Run host tests against the installed CLI and its native login (AGE
 	NATIVE_AGENT_HOST_AGENT=$(AGENT) go test -tags host -count=1 -v ./internal/hosttest
 
 .PHONY: tidy
-tidy: ## Verify module metadata
+tidy: ## Verify module metadata of the product and of tools/
 	go mod tidy
 	go mod verify
+	cd tools && go mod tidy && go mod verify
+
+.PHONY: lint-workflows
+lint-workflows: ## Check the GitHub Actions workflows
+	go tool -modfile=tools/go.mod actionlint
 
 .PHONY: vuln
 vuln: ## Scan Go dependencies for known vulnerabilities
 	go tool govulncheck ./...
 
 .PHONY: check
-check: tidy lint test vuln ## Run all repository checks
+check: tidy lint lint-workflows test vuln ## Run all repository checks
 
 .PHONY: build
 build: ## Build the local binary

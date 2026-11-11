@@ -10,7 +10,9 @@ make run
 make fmt
 ```
 
-`make check` runs module verification, linting, race-enabled tests, and `govulncheck`.
+`make check` runs module verification, linting, the workflow check (`actionlint`), race-enabled
+tests, and `govulncheck`. Development tools that are not part of the product have their own module
+in `tools/`, so they never change the product's dependencies.
 `make run` builds and serves with `--env-file .env` (git-ignored; copy `.env.example`);
 pass `ENV_FILE=path` for another file. Tests that need the real CLIs are described in
 [testing](testing.md).

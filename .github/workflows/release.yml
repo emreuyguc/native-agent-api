@@ -13,7 +13,8 @@ concurrency:
 
 jobs:
   check:
-    uses: ./.github/workflows/ci.yml
+    # actionlint does not know the $/ syntax yet.
+    uses: ./.github/workflows/ci.yml # zizmor: ignore[self-repository]
     permissions:
       contents: read
 
