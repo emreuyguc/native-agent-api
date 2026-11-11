@@ -32,8 +32,6 @@ sboms:
 checksum:
   name_template: checksums.txt
 
-changelog:
-  disable: true
-
+# No `changelog.disable`: it also skips `--release-notes`, and the release then has no notes.
 release:
   name_template: "{{ .Tag }}"
