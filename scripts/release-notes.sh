@@ -4,6 +4,8 @@
 set -eu
 tag=${1:?usage: scripts/release-notes.sh <tag, for example v0.2.0>}
 version=${tag#v}
+# A release candidate (v0.2.1-rc.1) uses the section of its version (0.2.1).
+version=${version%%-rc.*}
 cd "$(dirname "$0")/.."
 notes=$(awk -v v="$version" '
   index($0, "## [" v "]") == 1 { found = 1; next }

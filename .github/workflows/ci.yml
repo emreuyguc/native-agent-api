@@ -18,7 +18,8 @@ concurrency:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -43,11 +44,12 @@ jobs:
         if: ${{ !cancelled() && hashFiles('coverage.txt') != '' }}
         run: |
           { echo '```'; cat coverage.txt; echo '```'; } >>"$GITHUB_STEP_SUMMARY"
-      - run: make lint-scripts
+      - run: make lint-scripts check-release-config
 
   # zizmor finds unsafe patterns in the workflows: injection, token exposure, cache poisoning.
   workflows:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -60,7 +62,8 @@ jobs:
   # A pull request may not add a dependency with a known high or critical vulnerability.
   dependencies:
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
@@ -70,7 +73,8 @@ jobs:
   # per image in GitHub, and the jobs start without waiting for `check`.
   docker:
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
