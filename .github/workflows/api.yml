@@ -9,6 +9,11 @@ on:
 permissions:
   contents: read
 
+# A new push or label change cancels the older run of the same pull request.
+concurrency:
+  group: api-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   breaking-changes:
     runs-on: ubuntu-latest
