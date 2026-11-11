@@ -140,5 +140,4 @@ native-agent-api is an independent project, not affiliated with Anthropic or Ope
 CLI and the login you provide; your use of each CLI and account stays subject to that provider's
 terms, so check them before serving a personal subscription to other people or applications.
 
-Vulnerabilities: see [SECURITY.md](SECURITY.md). Contributions: run `make check` before a pull
-request. License: [Apache-2.0](LICENSE).
+Vulnerabilities: see [SECURITY.md](SECURITY.md). Contributions: see [CONTRIBUTING.md](CONTRIBUTING.md). License: [Apache-2.0](LICENSE).
