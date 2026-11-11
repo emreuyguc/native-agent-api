@@ -31,6 +31,16 @@ test: ## Run tests with the race detector
 test-host: ## Run host tests against the installed CLI and its native login (AGENT=claude|codex)
 	NATIVE_AGENT_HOST_AGENT=$(AGENT) go test -tags host -count=1 -v ./internal/hosttest
 
+.PHONY: fuzz
+fuzz: ## Run every fuzz target for FUZZTIME each (for example FUZZTIME=1m)
+	@test -n "$(FUZZTIME)" || { echo "pass FUZZTIME=<duration>, for example FUZZTIME=1m"; exit 1; }
+	@for pkg in $$(go list ./...); do \
+	  for target in $$(go test -list '^Fuzz' "$$pkg" | grep '^Fuzz'); do \
+	    echo "$$pkg $$target"; \
+	    go test -run '^$$' -fuzz "^$$target$$" -fuzztime "$(FUZZTIME)" "$$pkg" || exit 1; \
+	  done; \
+	done
+
 .PHONY: tidy
 tidy: ## Verify module metadata of the product and of tools/
 	go mod tidy
