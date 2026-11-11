@@ -4,9 +4,8 @@
 # outbound HTTP(S) only to the domains in the mounted allowlist, socat forwards the published API
 # port to the agent, which itself has no route out.
 
-ARG RUNTIME_IMAGE
-FROM ${RUNTIME_IMAGE}
-# Packages come from the pinned Alpine release branch of RUNTIME_IMAGE.
+FROM alpine:3.24.3@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
+# Packages come from the pinned Alpine release branch.
 # hadolint ignore=DL3018
 RUN apk add --no-cache tinyproxy socat
 COPY docker/edge/tinyproxy.conf /etc/tinyproxy/tinyproxy.conf

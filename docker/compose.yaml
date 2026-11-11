@@ -1,7 +1,7 @@
-# One native-agent-api container. Two files describe one installation:
-#   the Docker env file (--env-file, see docker/.env.example): Compose settings, the image, port
-#     and limits, and the path of the application env file. It holds no application setting.
-#   the application env file (CONTAINER_APP_ENV_FILE): the NATIVE_AGENT_* settings.
+# One native-agent-api container. Two files hold the choices of one installation:
+#   the Docker env file (--env-file, see docker/.env.example): name, agent, port and limits.
+#   the application env file (CONTAINER_APP_ENV_FILE): token, logging and gateway limits.
+# Everything else is fixed here or in the Dockerfiles, or derived from those choices.
 # Run Compose from the repository root: COMPOSE_FILE paths are relative to it.
 
 services:
@@ -9,13 +9,7 @@ services:
     build:
       context: ..
       dockerfile: docker/${CONTAINER_AGENT:?CONTAINER_AGENT is required}/Dockerfile
-      args:
-        GO_IMAGE: ${GO_IMAGE:?GO_IMAGE is required}
-        RUNTIME_IMAGE: ${RUNTIME_IMAGE:?RUNTIME_IMAGE is required}
-        VERSION: ${BUILD_VERSION:?BUILD_VERSION is required}
-        COMMIT: ${BUILD_COMMIT:?BUILD_COMMIT is required}
-        DATE: ${BUILD_DATE:?BUILD_DATE is required}
-    image: ${CONTAINER_IMAGE:?CONTAINER_IMAGE is required}
+    image: native-agent-api-${CONTAINER_AGENT:?CONTAINER_AGENT is required}:local
     restart: unless-stopped
     init: true
     read_only: true
@@ -35,19 +29,28 @@ services:
       - /tmp:rw,exec,nosuid,nodev,size=256m,uid=65532,gid=65532,mode=700
     stop_grace_period: 10s
     healthcheck:
-      # The CLI check makes the container unhealthy when CONTAINER_AGENT (the image) and
-      # NATIVE_AGENT_AGENT (the application) name different agents: each adapter runs its CLI by
-      # the agent's name.
-      test: ["CMD-SHELL", "native-agent-api healthcheck && command -v \"$$NATIVE_AGENT_AGENT\" >/dev/null"]
+      test: ["CMD", "/usr/local/bin/native-agent-api", "healthcheck"]
       interval: 15s
       timeout: 3s
       retries: 3
       start_period: 5s
     ports:
       - "${CONTAINER_PUBLISH_ADDR:?CONTAINER_PUBLISH_ADDR is required}:${CONTAINER_PUBLISH_PORT:?CONTAINER_PUBLISH_PORT is required}:8080"
-    # The application settings, from their own file. Compose does not read the shell for them.
+    # The application settings the installation chooses. Compose does not read the shell for them.
     env_file:
       - ${CONTAINER_APP_ENV_FILE:?CONTAINER_APP_ENV_FILE must point to the application env file}
+    # Settings the container layout fixes; they override the application env file.
+    environment:
+      # The image holds this agent's CLI.
+      NATIVE_AGENT_AGENT: ${CONTAINER_AGENT:?CONTAINER_AGENT is required}
+      # The container is the isolation boundary; bubblewrap cannot create namespaces in it.
+      NATIVE_AGENT_SANDBOX_MODE: external
+      # The published port reaches the container interface, never its loopback.
+      NATIVE_AGENT_LISTEN: 0.0.0.0:8080
+      # Named volumes; HOME is one too, so the native profile and its login persist.
+      NATIVE_AGENT_DATA_DIR: /data
+      NATIVE_AGENT_ALLOWED_ROOTS: /projects
+      NATIVE_AGENT_PROFILE_DIR: native
     volumes:
       # The whole HOME persists: the native profile keeps state in ~/.claude and ~/.claude.json
       # (Claude) or ~/.codex (Codex).

@@ -37,11 +37,6 @@ jobs:
         image: [claude, codex, edge]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Read pinned build images
-        id: pins
-        run: |
-          grep -E '^(GO_IMAGE|RUNTIME_IMAGE)=' docker/.env.example >> "$GITHUB_OUTPUT"
-          echo "date=$(git show -s --format=%cI HEAD)" >> "$GITHUB_OUTPUT"
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Build ${{ matrix.image }} image (amd64 + arm64)
@@ -51,9 +46,3 @@ jobs:
           file: docker/${{ matrix.image }}/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: false
-          build-args: |
-            GO_IMAGE=${{ steps.pins.outputs.GO_IMAGE }}
-            RUNTIME_IMAGE=${{ steps.pins.outputs.RUNTIME_IMAGE }}
-            VERSION=0.0.0-ci
-            COMMIT=${{ github.sha }}
-            DATE=${{ steps.pins.outputs.date }}

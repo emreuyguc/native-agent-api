@@ -239,8 +239,7 @@ file is not created and the agent says the call was declined. Close the run with
 builds and checks the image, starts the container, logs in, runs sections 2–9 against it and then
 10.3–10.5. By hand:
 
-Set up the installation as in [docker/README.md](../docker/README.md#setup), including the fixed
-container values. Log in inside the container through the API. Host credentials are not mounted:
+Set up the installation as in [docker/README.md](../docker/README.md#setup). Log in inside the container through the API. Host credentials are not mounted:
 Claude keeps them in the macOS Keychain, and a shared Codex `auth.json` makes the host and the
 container rotate the same refresh token, which signs one of them out.
 

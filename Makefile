@@ -52,6 +52,10 @@ run: build ## Build and serve with the local .env (override with ENV_FILE=path)
 	@test -f "$(ENV_FILE)" || { echo "$(ENV_FILE) not found: copy .env.example to $(ENV_FILE) and edit it, or pass ENV_FILE=path"; exit 1; }
 	./bin/$(BINARY) serve --env-file "$(ENV_FILE)"
 
+.PHONY: setup
+setup: ## Set up an installation interactively: host or Docker, env files, client token
+	@scripts/setup.sh
+
 .PHONY: clean
 clean: ## Remove local build output
 	rm -rf bin

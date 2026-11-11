@@ -1,41 +1,48 @@
 # Docker
 
 The optional Docker setup runs native-agent-api in one hardened container per installation. One
-installation serves one agent and has two files:
+installation serves one agent. You choose only what differs between installations:
 
-| File | Contents | Example |
+| File | Your choices | Example |
 |---|---|---|
-| Docker env file | Compose settings, image, port, limits, the agent image and the path of the application env file. No application setting. | [`docker/.env.example`](.env.example) |
-| Application env file | The `NATIVE_AGENT_*` settings, in the format of the host `.env` | [`/.env.example`](../.env.example) |
+| Docker env file | Name, agent, port, memory and CPU, restricted egress | [`docker/.env.example`](.env.example) |
+| Application env file | Client token, logging and gateway limits | [`/.env.example`](../.env.example) |
 
-`docker/compose.yaml` defines the container. `docker/compose.egress.yaml` is an optional overlay
-that restricts egress (see [Restricted egress](#restricted-egress)).
+Everything else is part of the distribution, not a setting:
+
+| Value | Where it is fixed |
+|---|---|
+| Go and Alpine base images, by tag and digest | The Dockerfiles |
+| CLI version and checksums | `docker/<agent>/Dockerfile`, equal to the adapter's tested version |
+| Build version, commit and date | Read from git during the build, like `make build` |
+| Image name, egress allowlist file | Derived from the agent in the Compose files |
+| `NATIVE_AGENT_AGENT`, `SANDBOX_MODE`, `LISTEN`, `DATA_DIR`, `ALLOWED_ROOTS`, `PROFILE_DIR` | `docker/compose.yaml`; they override the application env file |
+
+The container isolates the agent (`SANDBOX_MODE=external`), listens on `0.0.0.0:8080` behind the
+published port, and keeps `/data`, `/projects` and `HOME` in named volumes. Build from a git
+checkout: the image reads its version from it.
 
 ## Setup
 
-Run every command from the repository root.
+`make setup` does the steps below interactively: it asks for the agent, name and port, writes both
+env files, creates the client token and starts the container. To do them by hand, run every
+command from the repository root.
 
-1. Create the Docker env file and the application env file:
+1. Create the Docker env file. Its values serve Claude on `127.0.0.1:8701`:
 
    ```sh
    cp docker/.env.example docker/claude.env
-   cp .env.example docker/claude.app.env
+   ```
+
+2. Create the application env file without the settings that Compose fixes:
+
+   ```sh
+   grep '^NATIVE_AGENT_' .env.example |
+     grep -vE '_(AGENT|SANDBOX_MODE|LISTEN|DATA_DIR|ALLOWED_ROOTS|PROFILE_DIR)=' > docker/claude.app.env
    chmod 600 docker/claude.env docker/claude.app.env
    ```
 
-2. In `docker/claude.env`, set `CONTAINER_APP_ENV_FILE=./claude.app.env` and the `BUILD_*` values.
-   The other values serve Claude on `127.0.0.1:8701`.
-3. In `docker/claude.app.env`, set `NATIVE_AGENT_AGENT=claude` and the container values:
-
-   | Setting | Value | Reason |
-   |---|---|---|
-   | `NATIVE_AGENT_SANDBOX_MODE` | `external` | The container is the isolation boundary; bubblewrap cannot create namespaces in it |
-   | `NATIVE_AGENT_LISTEN` | `0.0.0.0:8080` | The published port reaches the container interface, never its loopback |
-   | `NATIVE_AGENT_DATA_DIR` | `/data` | Named volume |
-   | `NATIVE_AGENT_ALLOWED_ROOTS` | `/projects` | Named volume for attachable projects |
-   | `NATIVE_AGENT_PROFILE_DIR` | `native` | `HOME` (`/home/runner`) is a named volume, so the native profile and its login persist |
-
-4. Create a client token. Write the digest to `NATIVE_AGENT_TOKEN_SHA256` in
+3. Create a client token. Write the digest to `NATIVE_AGENT_TOKEN_SHA256` in
    `docker/claude.app.env`, and keep `$TOKEN` for the requests below:
 
    ```sh
@@ -46,13 +53,13 @@ Run every command from the repository root.
    `native-agent-api new-token` prints the same pair, on the host or with
    `docker compose --env-file docker/claude.env run --rm agent new-token`.
 
-5. Start the container:
+4. Start the container:
 
    ```sh
    docker compose --env-file docker/claude.env up -d --build --wait
    ```
 
-6. Log in through the API. The login lives in the home volume, so you log in once per
+5. Log in through the API. The login lives in the home volume, so you log in once per
    installation:
 
    ```sh
@@ -74,9 +81,6 @@ Run every command from the repository root.
 Do not use the `chatgpt` method or `native-agent-api login` for Codex in a container: they wait
 for a browser callback on localhost inside the container, which your browser cannot reach.
 
-`CONTAINER_AGENT` selects the image and must equal `NATIVE_AGENT_AGENT`. If they differ, the
-container reports unhealthy, because the image has no CLI for the configured agent.
-
 ## Several installations
 
 Each Docker env file is a separate installation: its own Compose project, volumes, port and
@@ -87,12 +91,10 @@ application env file. To serve Claude and Codex side by side, create `docker/cod
 | `COMPOSE_PROJECT_NAME` | `native-agent-api-codex` |
 | `CONTAINER_AGENT` | `codex` |
 | `CONTAINER_APP_ENV_FILE` | `./codex.app.env` |
-| `CONTAINER_IMAGE` | `native-agent-api-codex:local` |
 | `CONTAINER_PUBLISH_PORT` | `8702` |
-| `CONTAINER_EGRESS_ALLOW_FILE` | `./codex/egress-allow.txt` |
 
-In `docker/codex.app.env`, set `NATIVE_AGENT_AGENT=codex`. Then use `--env-file docker/codex.env`
-in every command and port `8702` for the API. Two installations of the same agent, for
+Create `docker/codex.app.env` as in step 2, with its own token. Then use
+`--env-file docker/codex.env` in every command and port `8702` for the API. Two installations of the same agent, for
 example with two accounts, need only different project names and ports.
 
 ## Operations
@@ -137,7 +139,7 @@ sudo chown 65532:65532 ./data && chmod 700 ./data
 ## Restricted egress
 
 By default the agent reaches any host, so web tools, MCP servers and package installs work. To
-allow only the hosts in `CONTAINER_EGRESS_ALLOW_FILE`, set in the Docker env file:
+allow only the hosts in `docker/<agent>/egress-allow.txt`, set in the Docker env file:
 
 ```sh
 COMPOSE_FILE=docker/compose.yaml:docker/compose.egress.yaml
@@ -167,6 +169,6 @@ USER 65532:65532
 
 1. Stop the old services with the 0.1.0 command, without `-v`.
 2. Create one Docker env file per agent as above. Point `CONTAINER_APP_ENV_FILE` at the existing
-   application env file.
+   application env file; Compose overrides its agent, sandbox, listener and directory settings.
 3. Keep `COMPOSE_PROJECT_NAME=native-agent-api-claude` (or `-codex`): the volumes keep their
    names, so the login and the data stay.

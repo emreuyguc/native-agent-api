@@ -116,6 +116,9 @@ curl -s http://127.0.0.1:8080/v1/ask -H "Authorization: Bearer $TOKEN" -H 'Conte
   -d '{"prompt":"Explain HTTP/2 in one sentence.","model":{"id":"sonnet","effort":"low"}}' | jq -r .result.text
 ```
 
+`make setup` does these steps interactively: it writes the env file, creates the client token and
+starts the gateway on this machine or in Docker.
+
 The interactive API reference is served at `/docs`, and the OpenAPI 3.1 document at
 `/openapi.yaml`. For Docker, see [docker/README.md](docker/README.md).
 

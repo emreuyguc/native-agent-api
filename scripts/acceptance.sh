@@ -210,19 +210,14 @@ set_kv() { # set_kv FILE KEY VALUE: replace or append KEY=VALUE, keeping the fil
   rm -f "$tmp"
 }
 
-# In a container the values below are not choices: the container is the isolation boundary
-# (bubblewrap cannot create namespaces there), HOME is a volume so the native profile persists,
-# and docker/compose.yaml mounts /data and /projects.
-DOCKER_FIXED=(
-  NATIVE_AGENT_LISTEN=0.0.0.0:8080 NATIVE_AGENT_SANDBOX_MODE=external NATIVE_AGENT_DATA_DIR=/data
-  NATIVE_AGENT_PROFILE_DIR=native NATIVE_AGENT_ALLOWED_ROOTS=/projects
-)
+# docker/compose.yaml sets these for a container, so its application env file leaves them out.
+DOCKER_FIXED='AGENT|SANDBOX_MODE|LISTEN|DATA_DIR|ALLOWED_ROOTS|PROFILE_DIR'
 
 docker_prepare() {
   command -v docker >/dev/null || { echo "docker is required" >&2; exit 2; }
   docker compose version >/dev/null 2>&1 || { echo "Docker Compose v2 is required" >&2; exit 2; }
   [[ -x $ROOT/bin/native-agent-api ]] || { echo "run make build first (new-token)" >&2; exit 2; }
-  local app token_file pair key port
+  local app token_file port
   COMPOSE_ENV="$ROOT/docker/$DOCKER_AGENT.env"
   port=8701
   [[ $DOCKER_AGENT == codex ]] && port=8702
@@ -231,44 +226,28 @@ docker_prepare() {
     chmod 600 "$COMPOSE_ENV"
     set_kv "$COMPOSE_ENV" COMPOSE_PROJECT_NAME "native-agent-api-$DOCKER_AGENT"
     set_kv "$COMPOSE_ENV" CONTAINER_AGENT "$DOCKER_AGENT"
-    set_kv "$COMPOSE_ENV" CONTAINER_IMAGE "native-agent-api-$DOCKER_AGENT:local"
     set_kv "$COMPOSE_ENV" CONTAINER_PUBLISH_PORT "$port"
-    set_kv "$COMPOSE_ENV" CONTAINER_EGRESS_ALLOW_FILE "./$DOCKER_AGENT/egress-allow.txt"
     echo "created docker/$DOCKER_AGENT.env from the example"
   fi
   [[ $(kv "$COMPOSE_ENV" CONTAINER_AGENT) == "$DOCKER_AGENT" ]] ||
     { echo "$COMPOSE_ENV: CONTAINER_AGENT must be $DOCKER_AGENT" >&2; exit 2; }
-  set_kv "$COMPOSE_ENV" BUILD_VERSION "$(git -C "$ROOT" describe --always --dirty 2>/dev/null || echo 0.0.0-dev)"
-  set_kv "$COMPOSE_ENV" BUILD_COMMIT "$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo 0000000000000000000000000000000000000000)"
-  set_kv "$COMPOSE_ENV" BUILD_DATE "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
   app=$(kv "$COMPOSE_ENV" CONTAINER_APP_ENV_FILE)
   [[ $app == /* ]] || app="$ROOT/docker/$app"
   token_file="$ROOT/docker/$DOCKER_AGENT.token.local.env"
-  if [[ $app == /absolute/path/* || ! -f $app ]]; then
+  if [[ ! -f $app ]]; then
     app="$ROOT/docker/$DOCKER_AGENT.app.local.env"
     if [[ ! -f $app ]]; then
       local generated digest
       generated=$("$ROOT/bin/native-agent-api" new-token)
       digest=$(grep -o 'SHA256=.*' <<<"$generated" | cut -d= -f2)
-      grep -vE '^\s*(#|$)' "$ROOT/.env.example" >"$app"
-      chmod 600 "$app"
-      set_kv "$app" NATIVE_AGENT_AGENT "$DOCKER_AGENT"
+      (umask 077; grep '^NATIVE_AGENT_' "$ROOT/.env.example" | grep -vE "^NATIVE_AGENT_($DOCKER_FIXED)=" >"$app")
       set_kv "$app" NATIVE_AGENT_TOKEN_SHA256 "$digest"
-      for pair in "${DOCKER_FIXED[@]}"; do set_kv "$app" "${pair%%=*}" "${pair#*=}"; done
       (umask 077; sed -n 2p <<<"$generated" | tr -d ' ' >"$token_file")
       echo "created $app and its client token in $token_file"
     fi
     set_kv "$COMPOSE_ENV" CONTAINER_APP_ENV_FILE "$app"
   fi
-  for pair in "${DOCKER_FIXED[@]}"; do
-    key=${pair%%=*}
-    if [[ $(kv "$app" "$key") != "${pair#*=}" ]]; then
-      echo "$app: $key must be ${pair#*=} in a container (found '$(kv "$app" "$key")')" >&2
-      exit 2
-    fi
-  done
-  [[ $(kv "$app" NATIVE_AGENT_AGENT) == "$DOCKER_AGENT" ]] || { echo "$app serves $(kv "$app" NATIVE_AGENT_AGENT), not $DOCKER_AGENT" >&2; exit 2; }
   # The same installation with the restricted egress overlay, for 10.4.
   EGRESS_ENV="$OUT/docker-egress.env"
   (umask 077; cp "$COMPOSE_ENV" "$EGRESS_ENV")

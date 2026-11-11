@@ -27,7 +27,8 @@ const (
 	Binary = "claude"
 )
 
-// Descriptor describes this adapter. Keep TestedVersion in sync with docker/claude/release.env.
+// Descriptor describes this adapter. docker/claude/Dockerfile installs TestedVersion; a test in
+// internal/agent/builtin keeps both equal.
 var Descriptor = agent.Info{
 	Name:     Name,
 	Title:    "Claude Code",

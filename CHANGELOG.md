@@ -12,6 +12,8 @@ All notable changes to this project are documented here. The format is based on
   `provider` options such as `permission_mode` and `reasoning_summary`, `agent.name`), and the
   values with their meaning in the description of `code`, `error.code` and `capabilities`.
   `docs/api.md` has the same tables, and tests keep both equal to the code.
+- `make setup` (`scripts/setup.sh`) sets up an installation interactively, on the host or in
+  Docker: it writes the env files, creates the client token and can start the gateway.
 - Every JSON request body has an example, so clients such as Postman build a minimal valid request
   instead of filling every optional field.
 
@@ -20,13 +22,19 @@ All notable changes to this project are documented here. The format is based on
 - The API document groups operations by task (`login`, `ask`, `permissions`, `native control`
   are new groups) and names each one in a few words, such as "Start login". The former one-line
   summary starts the description. Operation IDs and paths are unchanged.
-
 - Docker: one Compose file serves one installation. A Docker env file per installation holds the
   Compose and container settings and points to the application env file with
   `CONTAINER_APP_ENV_FILE`. `CONTAINER_AGENT` selects the image, and `COMPOSE_FILE` adds the
   restricted egress overlay. The `compose.<agent>.yaml` overlays, the profiles and the shared
   `docker/.env` are removed. `docker/verify.sh` takes the Docker env file. Volume names stay; see
   the upgrade steps in `docker/README.md`.
+- Docker: the env files hold only the choices of an installation. The base images are pinned in
+  the Dockerfiles, the build version, commit and date are read from git during the build, and
+  `docker/compose.yaml` sets the agent, sandbox mode, listener and directories of the container.
+  `GO_IMAGE`, `RUNTIME_IMAGE`, `BUILD_*`, `CONTAINER_IMAGE` and `CONTAINER_EGRESS_ALLOW_FILE` are
+  removed. Dependabot updates the base images.
+- Docker: the CLI release and its checksums are in `docker/<agent>/Dockerfile` instead of
+  `release.env`. A test keeps the version equal to the adapter's tested version.
 
 ### Security
 
