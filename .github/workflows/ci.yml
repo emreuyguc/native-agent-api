@@ -39,12 +39,26 @@ jobs:
           version: ${{ steps.golangci-lint.outputs.version }}
           install-only: true
       # The same target as the pre-commit hook; docs/development.md lists every target.
-      - run: make check-pre-commit GOLANGCI_LINT=golangci-lint TESTFLAGS=-count=1
+      # -shuffle=on finds tests that depend on their order; locally it would disable the test cache.
+      - run: make check-pre-commit GOLANGCI_LINT=golangci-lint TESTFLAGS="-count=1 -shuffle=on"
       - name: Coverage in the run summary
         if: ${{ !cancelled() && hashFiles('coverage.txt') != '' }}
         run: |
           { echo '```'; cat coverage.txt; echo '```'; } >>"$GITHUB_STEP_SUMMARY"
       - run: make lint-scripts check-release-config
+
+  # The release ships darwin binaries; process groups, the process table and os.Root differ there.
+  macos:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - run: make test TESTFLAGS="-count=1 -shuffle=on"
 
   # zizmor finds unsafe patterns in the workflows: injection, token exposure, cache poisoning.
   workflows:

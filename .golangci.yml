@@ -10,9 +10,11 @@ linters:
     - bodyclose
     - contextcheck
     - copyloopvar
+    - depguard
     - errname
     - errorlint
     - exhaustive
+    - forbidigo
     - gocritic
     - gosec
     - intrange
@@ -28,16 +30,31 @@ linters:
     - usestdlibvars
     - wastedassign
   settings:
-    errcheck:
-      exclude-functions:
-        - (io.Closer).Close
-        - (*os.File).Close
+    # AGENTS.md: adapters live in internal/agent/<name>; nothing outside them branches on the agent.
+    depguard:
+      rules:
+        adapters:
+          files:
+            - $all
+            - "!$test"
+            - "!**/internal/agent/builtin/**"
+            - "!**/internal/agent/claude/**"
+            - "!**/internal/agent/codex/**"
+          deny:
+            - pkg: github.com/emreuyguc/native-agent-api/internal/agent/claude
+              desc: only internal/agent/builtin selects an adapter
+            - pkg: github.com/emreuyguc/native-agent-api/internal/agent/codex
+              desc: only internal/agent/builtin selects an adapter
+    # AGENTS.md: the server environment never reaches the CLI. Only internal/cli reads it, once, at
+    # startup; everything else gets explicit configuration.
+    forbidigo:
+      analyze-types: true
+      forbid:
+        - pattern: ^os\.(Getenv|LookupEnv|Environ|Setenv|Unsetenv|Clearenv)$
+          msg: read the environment only in internal/cli and pass explicit configuration
     gocritic:
       enabled-tags: [diagnostic, performance, style]
       disabled-checks: [hugeParam, unnamedResult, whyNoLint]
-    gosec:
-      excludes:
-        - G204 # Subprocess launched with variable: launching the agent CLI is the purpose of this project.
     nolintlint:
       require-explanation: true
       require-specific: true
@@ -55,7 +72,9 @@ linters:
     presets: [comments, std-error-handling]
     rules:
       - path: _test\.go
-        linters: [gosec, errcheck, bodyclose, noctx]
+        linters: [gosec, errcheck, bodyclose, noctx, forbidigo]
+      - path: ^internal/cli/
+        linters: [forbidigo]
 
 formatters:
   enable:

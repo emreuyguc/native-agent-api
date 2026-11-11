@@ -220,7 +220,7 @@ func RunInteractive(ctx context.Context, opts Options, stdio agent.IO, command a
 	default:
 		return agent.ErrUnsupported
 	}
-	cmd := exec.CommandContext(ctx, opts.Binary, args...)
+	cmd := exec.CommandContext(ctx, opts.Binary, args...) //nolint:gosec // G204: the configured agent CLI with fixed auth arguments, no shell.
 	cmd.Dir = opts.WorkDir
 	cmd.Env = Environment(opts)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = stdio.Stdin, stdio.Stdout, stdio.Stderr
