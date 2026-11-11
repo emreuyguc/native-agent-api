@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-12
+
+A security release: the images no longer contain the critical zlib vulnerability CVE-2026-4738.
+Releases are now published only after every archive and image passes verification.
+
 ### Changed
 
 - Releases: the release workflow publishes nothing until every archive and image passes
@@ -109,6 +114,7 @@ First public release.
   configuration.
 - Optional hardened Docker setup per agent, with resource limits and an egress-controlled variant.
 
-[Unreleased]: https://github.com/emreuyguc/native-agent-api/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/emreuyguc/native-agent-api/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/emreuyguc/native-agent-api/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/emreuyguc/native-agent-api/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/emreuyguc/native-agent-api/releases/tag/v0.1.0
