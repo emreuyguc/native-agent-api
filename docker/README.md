@@ -22,6 +22,9 @@ The container isolates the agent (`SANDBOX_MODE=external`), listens on `0.0.0.0:
 published port, and keeps `/data`, `/projects` and `HOME` in named volumes. Build from a git
 checkout: the image reads its version from it.
 
+Each release also publishes the images on GHCR as `ghcr.io/emreuyguc/native-agent-api-<agent>` and
+`-edge`; see [releasing](../docs/releasing.md). The Compose files build the image from source.
+
 ## Setup
 
 `make setup` does the steps below interactively: it asks for the agent, name and port, writes both
