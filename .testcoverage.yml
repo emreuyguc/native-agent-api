@@ -1,4 +1,4 @@
-# Test coverage limits for `make coverage` and the `check` job in CI (go-test-coverage).
+# Test coverage limits for `make check-coverage` and the `check` job in CI (go-test-coverage).
 # Raise `total` when coverage grows; never lower it to let a change pass.
 profile: coverage.out
 

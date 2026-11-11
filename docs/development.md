@@ -1,25 +1,68 @@
 # Development
 
-Requirements: Go 1.27.4+, golangci-lint 2.15, and Docker for the container images.
+Requirements: Go (version in `go.mod`) and, for the full checks, Docker. Every other tool comes
+with the repository at a fixed version.
 
 ```sh
 make help
-make check
+make check-pre-commit
 make build
 make run
-make fmt
+make format-code
 ```
 
-`make check` runs module verification, linting, the workflow check (`actionlint`), race-enabled
-tests, and `govulncheck`. Development tools that are not part of the product have their own module
-in `tools/`, so they never change the product's dependencies.
 `make run` builds and serves with `--env-file .env` (git-ignored; copy `.env.example`);
 pass `ENV_FILE=path` for another file. Tests that need the real CLIs are described in
 [testing](testing.md).
 
+## Checks
+
+Every check is a `make` target, and CI runs the same checks with the same tool versions. Where
+GitHub does it faster, CI uses its own tools: the released golangci-lint binary and a BuildKit
+cache for the images.
+
+| Target | When | What it runs | Time (warm) |
+|---|---|---|---|
+| `make check-pre-commit` | Before a commit; needs only Go | `verify-modules`, `lint-go`, `lint-workflows`, `check-coverage` (runs `test`), `scan-vulnerabilities` | Seconds when little changed; about 50 s from scratch |
+| `make check-pre-push` | Before a push; needs Docker | `check-pre-commit`, then `audit-workflows`, `lint-scripts`, `check-api-compatibility`, `check-release-config` | About 30 s more |
+| `make check-all` | Before a release or a large change | `check-pre-push`, then `test-fuzz`, `build-images`, `build-release-snapshot` | Some minutes |
+
+| Target | Checks | CI job |
+|---|---|---|
+| `verify-modules`, `lint-go`, `lint-workflows`, `check-coverage`, `scan-vulnerabilities`, `lint-scripts` | Modules, Go lint, workflow lint, tests and coverage, known vulnerabilities, shell scripts | `ci` / `check` |
+| `audit-workflows` | Workflow security (zizmor) | `ci` / `workflows` |
+| `check-api-compatibility BASE=…` | API changes that break clients | `api` / `breaking-changes` |
+| `check-release-config` | `.goreleaser.yaml` | `release` |
+| `test-fuzz FUZZTIME=…` | New fuzz inputs; `check-all` uses 10 seconds per target | `fuzz`, weekly with 2 minutes |
+| `build-images` | The Docker images, without pushing | `ci` / `docker` (amd64 and arm64) |
+| `build-release-snapshot` | The release archives and SBOMs in `dist/`, without publishing | `release` publishes them |
+
+`make test` reuses the results of packages that did not change; `TESTFLAGS=-count=1` runs every
+test, as CI does. `check-pre-push` and `check-all` compare the API with `origin/main`; pass
+`BASE=` for another base.
+
+`make install-git-hooks` makes git run `check-pre-commit` before each commit and `check-pre-push`
+before each push (`.githooks/`); `make uninstall-git-hooks` stops it. The commit hook refuses
+unstaged changes, and the push hook refuses to push a commit other than the checked-out one: the
+checks read the working tree. Skip a hook once with `--no-verify`.
+
+Only GitHub can run these: the dependency review, CodeQL, OpenSSF Scorecard, and the signed
+provenance and publishing of a release.
+
+### Tool versions
+
+| Tools | Version pinned in | Runs with |
+|---|---|---|
+| actionlint, oasdiff, go-test-coverage | `tools/go.mod` | `go tool` |
+| golangci-lint | `tools/golangci-lint/go.mod` | `go tool`; its own module because of its dependencies |
+| govulncheck | `go.mod` | `go tool` |
+| zizmor, ShellCheck, GoReleaser | `tools/docker/<name>/Dockerfile` (tag and digest) | Docker; the release workflow runs the same GoReleaser version |
+
+None of them changes the product's dependencies. Dependabot updates all of them.
+
 ## API compatibility
 
-`make api-diff BASE=origin/main` compares the generated OpenAPI document with the one of `BASE`.
+`make check-api-compatibility BASE=origin/main` compares the generated OpenAPI document with the one of `BASE`.
 It lists every change that can break an existing client, such as a removed field or a new
 `enum`. A pull request runs it against its base branch and fails on such a change. When the change
 is intended, add the `api-breaking` label to the pull request and describe the change in

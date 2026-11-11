@@ -1,4 +1,4 @@
-# golangci-lint v2 configuration. Run with `make lint`.
+# golangci-lint v2 configuration. Run with `make lint-go`.
 version: "2"
 
 run:

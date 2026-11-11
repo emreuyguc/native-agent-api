@@ -4,7 +4,7 @@
 
 ## Checks
 
-- [ ] `make check` passes
+- [ ] `make check-pre-push` passes, or `make check-pre-commit` without Docker
 - [ ] Tests cover the change
 - [ ] `CHANGELOG.md` has a line under `[Unreleased]`, or users do not notice the change
 - [ ] Documentation updated, or nothing it describes changed

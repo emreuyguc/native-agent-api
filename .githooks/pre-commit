@@ -1,0 +1,9 @@
+#!/bin/sh
+# Installed by `make install-git-hooks`. Skip once with: git commit --no-verify
+# The checks read the working tree, so it must equal what the commit contains.
+if ! git diff --quiet; then
+  echo "pre-commit: tracked files have unstaged changes; stage or stash them, so the checks see the commit" >&2
+  git diff --stat >&2
+  exit 1
+fi
+exec make check-pre-commit

@@ -9,35 +9,45 @@ LDFLAGS := -s -w \
 	-X $(MODULE)/internal/buildinfo.Commit=$(COMMIT) \
 	-X $(MODULE)/internal/buildinfo.Date=$(DATE)
 
+# Development tools. Go tools have their own modules in tools/; the other tools run from the image
+# in tools/docker/<name>/Dockerfile. Dependabot updates both, and CI runs the same versions.
+# CI installs the same golangci-lint version as a binary and passes GOLANGCI_LINT=golangci-lint.
+GOLANGCI_LINT ?= go tool -modfile=tools/golangci-lint/go.mod golangci-lint
+TOOLS := go tool -modfile=tools/go.mod
+GO_MODULES := . tools tools/golangci-lint
+tool_image = $(shell sed -n 's/^FROM //p' tools/docker/$(1)/Dockerfile)
+IMAGES := claude codex edge
+
 .DEFAULT_GOAL := help
 
 .PHONY: help
 help:
-	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*##/ {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*##/ {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-.PHONY: fmt
-fmt: ## Format Go files
-	golangci-lint fmt ./...
+.PHONY: format-code
+format-code: ## Format Go files
+	$(GOLANGCI_LINT) fmt ./...
 
-.PHONY: lint
-lint: ## Run static analysis
-	golangci-lint run ./...
+.PHONY: lint-go
+lint-go: ## Run static analysis
+	$(GOLANGCI_LINT) run ./...
 
+# Locally Go reuses the results of unchanged packages. CI passes TESTFLAGS=-count=1 to run all.
 .PHONY: test
-test: ## Run tests with the race detector
-	go test -race -count=1 ./...
+test: ## Run tests with the race detector and write coverage.out (TESTFLAGS=-count=1 runs all)
+	go test -race $(TESTFLAGS) -coverprofile=coverage.out ./...
 
-.PHONY: coverage
-coverage: ## Measure test coverage and check it against .testcoverage.yml
-	go test -count=1 -coverprofile=coverage.out ./...
-	go tool -modfile=tools/go.mod go-test-coverage --config=.testcoverage.yml
+.PHONY: check-coverage
+check-coverage: test ## Check the test coverage against .testcoverage.yml; writes coverage.txt
+	@status=0; $(TOOLS) go-test-coverage --config=.testcoverage.yml >coverage.txt || status=$$?; \
+	  cat coverage.txt; exit $$status
 
 .PHONY: test-host
 test-host: ## Run host tests against the installed CLI and its native login (AGENT=claude|codex)
 	NATIVE_AGENT_HOST_AGENT=$(AGENT) go test -tags host -count=1 -v ./internal/hosttest
 
-.PHONY: fuzz
-fuzz: ## Run every fuzz target for FUZZTIME each (for example FUZZTIME=1m)
+.PHONY: test-fuzz
+test-fuzz: ## Run every fuzz target for FUZZTIME each (for example FUZZTIME=1m)
 	@test -n "$(FUZZTIME)" || { echo "pass FUZZTIME=<duration>, for example FUZZTIME=1m"; exit 1; }
 	@for pkg in $$(go list ./...); do \
 	  for target in $$(go test -list '^Fuzz' "$$pkg" | grep '^Fuzz'); do \
@@ -46,27 +56,89 @@ fuzz: ## Run every fuzz target for FUZZTIME each (for example FUZZTIME=1m)
 	  done; \
 	done
 
-.PHONY: tidy
-tidy: ## Verify module metadata of the product and of tools/
-	go mod tidy
-	go mod verify
-	cd tools && go mod tidy && go mod verify
+.PHONY: tidy-modules
+tidy-modules: ## Tidy the product module and every tool module
+	@for m in $(GO_MODULES); do (cd $$m && go mod tidy) || exit 1; done
+
+.PHONY: verify-modules
+verify-modules: ## Check that every module is tidy and matches go.sum
+	@for m in $(GO_MODULES); do echo "$$m"; (cd $$m && go mod tidy -diff && go mod verify) || exit 1; done
 
 .PHONY: lint-workflows
-lint-workflows: ## Check the GitHub Actions workflows
-	go tool -modfile=tools/go.mod actionlint
+lint-workflows: ## Check the GitHub Actions workflows (actionlint)
+	$(TOOLS) actionlint
 
-.PHONY: vuln
-vuln: ## Scan Go dependencies for known vulnerabilities
+# Without a GitHub token zizmor runs offline. CI passes ZIZMOR_ONLINE=1 and GH_TOKEN to also look
+# up known vulnerable actions; GH_TOKEN reaches the container only then.
+.PHONY: audit-workflows
+audit-workflows: ## Find unsafe patterns in the workflows and Dependabot config (zizmor, Docker)
+	docker run --rm -v "$(CURDIR)":/src:ro -w /src $(if $(ZIZMOR_ONLINE),-e GH_TOKEN,) \
+	  $(call tool_image,zizmor) $(if $(ZIZMOR_ONLINE),,--offline) .
+
+.PHONY: lint-scripts
+lint-scripts: ## Check the shell scripts (ShellCheck, Docker)
+	docker run --rm -v "$(CURDIR)":/src:ro -w /src $(call tool_image,shellcheck) \
+	  $$(git ls-files '*.sh' .githooks)
+
+.PHONY: scan-vulnerabilities
+scan-vulnerabilities: ## Scan Go dependencies for known vulnerabilities
 	go tool govulncheck ./...
 
-.PHONY: api-diff
-api-diff: ## List API changes that break clients, against BASE (for example BASE=origin/main)
+.PHONY: check-api-compatibility
+check-api-compatibility: ## List API changes that break clients, against BASE (for example BASE=origin/main)
 	@test -n "$(BASE)" || { echo "pass BASE=<revision>, for example BASE=origin/main"; exit 1; }
 	scripts/api-diff.sh "$(BASE)"
 
-.PHONY: check
-check: tidy lint lint-workflows test vuln ## Run all repository checks
+.PHONY: build-images
+build-images: ## Build the Docker images without pushing (IMAGE=claude|codex|edge, PLATFORMS=<list>)
+	@for image in $(or $(IMAGE),$(IMAGES)); do \
+	  echo "image $$image"; \
+	  docker buildx build --file docker/$$image/Dockerfile $(if $(PLATFORMS),--platform $(PLATFORMS),) . || exit 1; \
+	done
+
+.PHONY: build-release-snapshot
+# The image may have an older Go than go.mod; GOTOOLCHAIN=auto fetches the right one into a
+# volume, so the next run reuses it.
+build-release-snapshot: ## Build the release archives and SBOMs into dist/ without publishing (GoReleaser, Docker)
+	docker run --rm -v "$(CURDIR)":/src -w /src -v native-agent-api-goreleaser:/go -e GOCACHE=/go/cache \
+	  -e GOTOOLCHAIN=auto -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/src \
+	  $(call tool_image,goreleaser) release --snapshot --clean --skip=publish
+
+.PHONY: check-release-config
+check-release-config: ## Validate .goreleaser.yaml (GoReleaser, Docker)
+	docker run --rm -v "$(CURDIR)":/src:ro -w /src $(call tool_image,goreleaser) check
+
+# Three levels. The git hooks run the first two; check-all adds the slow builds that CI runs on
+# every pull request. docs/development.md lists which CI job runs which target.
+.PHONY: check-pre-commit
+check-pre-commit: verify-modules lint-go lint-workflows check-coverage scan-vulnerabilities ## Before a commit: Go checks, tests and coverage (needs only Go)
+	@echo "check-pre-commit: OK"
+
+.PHONY: check-pre-push
+check-pre-push: check-pre-commit audit-workflows lint-scripts check-api-compatibility check-release-config ## Before a push: adds workflow, script, API and release checks (needs Docker)
+	@echo "check-pre-push: OK"
+
+.PHONY: check-all
+check-all: check-pre-push test-fuzz build-images build-release-snapshot ## Everything CI runs that works locally: adds fuzzing, images and release archives
+	@echo "check-all: OK"
+
+check-pre-push check-all: BASE ?= origin/main
+check-all: FUZZTIME ?= 10s
+
+# Another hooks directory stays: install refuses to replace it, and uninstall removes only ours.
+.PHONY: install-git-hooks
+install-git-hooks: ## Make git run check-pre-commit before each commit and check-pre-push before each push
+	@current=$$(git config --local --get core.hooksPath || true); \
+	if [ -n "$$current" ] && [ "$$current" != .githooks ]; then \
+	  echo "core.hooksPath is already $$current; remove it first"; exit 1; fi
+	git config --local core.hooksPath .githooks
+	@echo "git hooks: .githooks (remove with: make uninstall-git-hooks)"
+
+.PHONY: uninstall-git-hooks
+uninstall-git-hooks: ## Stop git from running the checks before commits and pushes
+	@if [ "$$(git config --local --get core.hooksPath || true)" = .githooks ]; then \
+	  git config --local --unset core.hooksPath; echo "git hooks: removed"; \
+	else echo "git hooks: not installed by this repository"; fi
 
 .PHONY: build
 build: ## Build the local binary

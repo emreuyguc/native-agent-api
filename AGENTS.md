@@ -30,7 +30,8 @@ native-agent-api serves one native agent CLI (Claude Code or Codex CLI) over HTT
 
 ### Code and checks
 
-- Run `make check` before every commit; it must pass clean.
+- Run `make check-pre-commit` before every commit and `make check-pre-push` before every push;
+  both must pass clean.
 - Never add AI attribution to commits or pull requests: no `Co-Authored-By` lines for an AI and no
   "Generated with" footers.
 - The OpenAPI document is generated from Go types; never edit it by hand.

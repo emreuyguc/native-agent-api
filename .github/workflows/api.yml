@@ -30,7 +30,7 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
           ALLOWED: ${{ contains(github.event.pull_request.labels.*.name, 'api-breaking') }}
         run: |
-          if scripts/api-diff.sh "origin/$BASE_REF"; then exit 0; fi
+          if make check-api-compatibility BASE="origin/$BASE_REF"; then exit 0; fi
           if [ "$ALLOWED" = true ]; then
             echo "::notice::Breaking API changes accepted by the api-breaking label."
             exit 0
