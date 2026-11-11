@@ -36,7 +36,7 @@ cache for the images.
 | `test-fuzz FUZZTIME=…` | New fuzz inputs; `FUZZ_PKG=` and `FUZZ_TARGET=` pick one target; `check-all` uses 10 seconds per target | `fuzz`, weekly, one job of 10 minutes per target |
 | `check-cli-releases` | Each agent CLI pin is at most 14 days behind its releases | `cli-releases`, weekly |
 | `build-images` | The Docker images, without pushing | `ci` / `docker` (amd64 and arm64) |
-| `test-image AGENT=…` | One agent image starts hardened and healthy without a login (`docker/verify.sh`) | `ci` / `docker` (amd64) |
+| `test-image AGENT=…` | One agent image starts hardened and healthy without a login (`docker/verify.sh`); `NO_BUILD=1` tests the image already built | `ci` / `docker` (amd64) |
 | `scan-images SCAN=…` | Local images have no fixed high or critical vulnerability (Grype) | `ci` / `docker`; `scan`, weekly over the latest release |
 | `build-release-snapshot` | The release archives and SBOMs in `dist/`, without publishing | `release` publishes them |
 
