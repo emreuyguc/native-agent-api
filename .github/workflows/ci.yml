@@ -32,6 +32,13 @@ jobs:
         run: make lint-workflows
       - name: Test
         run: go test -race -count=1 -coverprofile=coverage.out ./...
+      - name: Coverage
+        run: |
+          status=0
+          go tool -modfile=tools/go.mod go-test-coverage --config=.testcoverage.yml >coverage.txt || status=$?
+          cat coverage.txt
+          { echo '```'; cat coverage.txt; echo '```'; } >>"$GITHUB_STEP_SUMMARY"
+          exit "$status"
       - name: Vulnerability scan
         run: go tool govulncheck ./...
 
