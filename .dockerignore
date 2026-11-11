@@ -5,3 +5,4 @@
 !cmd/
 !internal/
 !docker/edge/tinyproxy.conf
+**/.DS_Store
