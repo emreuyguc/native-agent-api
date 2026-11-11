@@ -17,6 +17,14 @@ in `tools/`, so they never change the product's dependencies.
 pass `ENV_FILE=path` for another file. Tests that need the real CLIs are described in
 [testing](testing.md).
 
+## API compatibility
+
+`make api-diff BASE=origin/main` compares the generated OpenAPI document with the one of `BASE`.
+It lists every change that can break an existing client, such as a removed field or a new
+`enum`. A pull request runs it against its base branch and fails on such a change. When the change
+is intended, add the `api-breaking` label to the pull request and describe the change in
+`CHANGELOG.md`.
+
 ## Repository layout
 
 ```text
@@ -31,7 +39,7 @@ internal/workspace/     workspaces, host-directory attachments, and file operati
 internal/permission/    in-memory permission rules
 internal/fsroot/        allowed-root policy
 docker/                optional container images and Compose definitions
-scripts/               interactive setup, release notes and the end-to-end acceptance runner
+scripts/               interactive setup, release notes, API diff and the end-to-end acceptance runner
 ```
 
 A new adapter goes in `internal/agent/<name>`, is registered in `internal/agent/builtin`, and gets

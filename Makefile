@@ -45,6 +45,11 @@ lint-workflows: ## Check the GitHub Actions workflows
 vuln: ## Scan Go dependencies for known vulnerabilities
 	go tool govulncheck ./...
 
+.PHONY: api-diff
+api-diff: ## List API changes that break clients, against BASE (for example BASE=origin/main)
+	@test -n "$(BASE)" || { echo "pass BASE=<revision>, for example BASE=origin/main"; exit 1; }
+	scripts/api-diff.sh "$(BASE)"
+
 .PHONY: check
 check: tidy lint lint-workflows test vuln ## Run all repository checks
 
