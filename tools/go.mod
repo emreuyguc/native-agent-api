@@ -5,6 +5,7 @@ module github.com/emreuyguc/native-agent-api/tools
 go 1.27.4
 
 tool (
+	github.com/boumenot/gocover-cobertura
 	github.com/oasdiff/oasdiff
 	github.com/rhysd/actionlint/cmd/actionlint
 )
@@ -14,6 +15,7 @@ require (
 	github.com/TwiN/go-color v1.4.1 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/bmatcuk/doublestar/v4 v4.10.0 // indirect
+	github.com/boumenot/gocover-cobertura v1.5.0 // indirect
 	github.com/buger/jsonparser v1.6.1 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/fatih/color v1.19.0 // indirect
@@ -52,7 +54,9 @@ require (
 	github.com/yuin/goldmark v1.8.6 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.3 // indirect
+	golang.org/x/mod v0.41.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
+	golang.org/x/tools v0.51.0 // indirect
 )

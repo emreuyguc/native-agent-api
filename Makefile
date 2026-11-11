@@ -27,6 +27,11 @@ lint: ## Run static analysis
 test: ## Run tests with the race detector
 	go test -race -count=1 ./...
 
+.PHONY: coverage
+coverage: ## Write the test coverage to coverage.out and, as Cobertura XML, to coverage.xml
+	go test -count=1 -coverprofile=coverage.out ./...
+	go tool -modfile=tools/go.mod gocover-cobertura <coverage.out >coverage.xml
+
 .PHONY: test-host
 test-host: ## Run host tests against the installed CLI and its native login (AGENT=claude|codex)
 	NATIVE_AGENT_HOST_AGENT=$(AGENT) go test -tags host -count=1 -v ./internal/hosttest
