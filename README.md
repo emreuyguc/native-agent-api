@@ -100,7 +100,9 @@ With Docker, each installation is one container with its own volumes; see
 
 ## Quick start
 
-Requires macOS or Linux, Go, and the agent CLI on `PATH`.
+Requires macOS or Linux, Go, and the agent CLI on `PATH`. Without Go, download a binary from the
+[releases](https://github.com/emreuyguc/native-agent-api/releases) and
+[verify it](docs/releasing.md#verify-a-release).
 
 ```sh
 git clone https://github.com/emreuyguc/native-agent-api && cd native-agent-api
@@ -129,7 +131,7 @@ The interactive API reference is served at `/docs`, and the OpenAPI 3.1 document
 - [Security model](docs/security.md): read this before exposing the gateway
 - [Roadmap and feature status](ROADMAP.md): what works per agent, what is planned
 - [Platform support](docs/platforms.md), [development](docs/development.md),
-  [testing](docs/testing.md)
+  [testing](docs/testing.md), [releasing](docs/releasing.md)
 
 ## Notes
 

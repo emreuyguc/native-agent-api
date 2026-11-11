@@ -1,0 +1,39 @@
+# Release binaries. .github/workflows/release.yml runs GoReleaser for a version tag; the release
+# notes come from CHANGELOG.md. docs/releasing.md describes the steps.
+version: 2
+
+project_name: native-agent-api
+
+builds:
+  - id: native-agent-api
+    main: ./cmd/native-agent-api
+    binary: native-agent-api
+    env: [CGO_ENABLED=0]
+    # docs/platforms.md: no native Windows.
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    # The same identity as `make build`: the tag, the commit and its date.
+    ldflags:
+      - -s -w
+      - -X github.com/emreuyguc/native-agent-api/internal/buildinfo.Version={{ .Tag }}
+      - -X github.com/emreuyguc/native-agent-api/internal/buildinfo.Commit={{ .FullCommit }}
+      - -X github.com/emreuyguc/native-agent-api/internal/buildinfo.Date={{ .CommitDate }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files: [LICENSE, README.md, CHANGELOG.md, .env.example]
+
+sboms:
+  - artifacts: archive
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  disable: true
+
+release:
+  name_template: "{{ .Tag }}"

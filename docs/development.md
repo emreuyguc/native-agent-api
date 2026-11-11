@@ -29,7 +29,7 @@ internal/workspace/     workspaces, host-directory attachments, and file operati
 internal/permission/    in-memory permission rules
 internal/fsroot/        allowed-root policy
 docker/                optional container images and Compose definitions
-scripts/               interactive setup and the end-to-end acceptance runner
+scripts/               interactive setup, release notes and the end-to-end acceptance runner
 ```
 
 A new adapter goes in `internal/agent/<name>`, is registered in `internal/agent/builtin`, and gets
