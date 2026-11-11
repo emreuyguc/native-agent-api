@@ -12,14 +12,15 @@ writing rules are in [AGENTS.md](AGENTS.md); they apply to people and coding age
 
 ## Make the change
 
-1. Set up the tools: Go (version in `go.mod`), golangci-lint and, for images, Docker. See
-   [development](docs/development.md).
+1. Set up the tools: Go (version in `go.mod`) and Docker. The other tools come with the
+   repository; see [development](docs/development.md).
 2. Keep native behavior native: pass the CLI's behavior through, do not re-implement it.
 3. Add tests for real behavior. A change that can widen what the agent reaches also needs an entry
    in [docs/security.md](docs/security.md).
 4. Update the documentation that owns each fact, and add a line to `CHANGELOG.md` under
    `[Unreleased]` for a change users notice.
-5. Run `make check`. It must pass clean.
+5. Run `make check-pre-push` (or `make check-pre-commit` without Docker). It must pass clean.
+   `make hooks` makes git run them for you.
 
 Changes to an adapter, the run lifecycle or the Docker setup also need the checks with the real
 CLI in [testing](docs/testing.md); say in the pull request which ones you ran.
@@ -28,7 +29,7 @@ CLI in [testing](docs/testing.md); say in the pull request which ones you ran.
 
 - One topic per pull request. Write the commit subject in the imperative, for example
   "Reject empty tool rules".
-- CI runs the checks, the image builds, a workflow check and a dependency review.
+- CI runs the same `make` targets, plus a dependency review and CodeQL, which need GitHub.
 - A change that breaks API clients fails the `api` check. If it is intended, a maintainer adds the
   `api-breaking` label; see [API compatibility](docs/development.md#api-compatibility).
 - Do not edit the OpenAPI document by hand: it is generated from the Go types.

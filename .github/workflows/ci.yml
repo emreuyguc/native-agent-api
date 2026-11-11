@@ -26,27 +26,15 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - name: Verify modules
+          # The tool modules in tools/ are built too.
+          cache-dependency-path: "**/go.sum"
+      # The same target as the pre-commit hook; docs/development.md lists every target.
+      - run: make check-pre-commit
+      - name: Coverage in the run summary
+        if: ${{ !cancelled() && hashFiles('coverage.txt') != '' }}
         run: |
-          go mod tidy -diff
-          go mod verify
-          cd tools && go mod tidy -diff && go mod verify
-      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
-        with:
-          version: v2.15.0
-      - name: Check workflows
-        run: make lint-workflows
-      - name: Test
-        run: go test -race -count=1 -coverprofile=coverage.out ./...
-      - name: Coverage
-        run: |
-          status=0
-          go tool -modfile=tools/go.mod go-test-coverage --config=.testcoverage.yml >coverage.txt || status=$?
-          cat coverage.txt
           { echo '```'; cat coverage.txt; echo '```'; } >>"$GITHUB_STEP_SUMMARY"
-          exit "$status"
-      - name: Vulnerability scan
-        run: go tool govulncheck ./...
+      - run: make lint-shell
 
   # zizmor finds unsafe patterns in the workflows: injection, token exposure, cache poisoning.
   workflows:
@@ -55,10 +43,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zizmorcore/zizmor-action@53290badfa369cb0bf7ad16342cb62c2fa47ac7b # v0.8.0
-        with:
-          version: 1.31.1
-          advanced-security: false
+      # The token lets zizmor look up actions with known vulnerabilities.
+      - run: make lint-zizmor ZIZMOR_ONLINE=1
+        env:
+          GH_TOKEN: ${{ github.token }}
 
   # A pull request may not add a dependency with a known high or critical vulnerability.
   dependencies:
@@ -84,9 +72,6 @@ jobs:
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Build ${{ matrix.image }} image (amd64 + arm64)
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          file: docker/${{ matrix.image }}/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: false
+        run: make images IMAGE="$IMAGE" PLATFORMS=linux/amd64,linux/arm64
+        env:
+          IMAGE: ${{ matrix.image }}
