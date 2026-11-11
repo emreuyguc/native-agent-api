@@ -6,7 +6,6 @@
 set -eu
 
 cd "$(dirname "$0")/.."
-ROOT=$(pwd)
 
 if [ -t 1 ]; then
   B=$(printf '\033[1m') D=$(printf '\033[2m') G=$(printf '\033[32m') R=$(printf '\033[31m') N=$(printf '\033[0m')
@@ -40,6 +39,7 @@ choose() {
     index=$((index + 1))
     printf '  %s) %s\n' "$index" "${option#*:}"
   done
+  picked="" # ask sets it
   while :; do
     ask picked "Choice" 1
     index=0
@@ -56,6 +56,7 @@ choose() {
 
 # confirm "Question" y|n: true for yes; the second argument is the suggestion.
 confirm() {
+  reply="" # ask sets it
   while :; do
     ask reply "$1 (y/n)" "$2"
     case $reply in
@@ -108,15 +109,32 @@ say "One installation serves one agent. Run this again for another one."
 
 title "1. How to run"
 choose MODE "Run the gateway:" \
-  "docker:In a Docker container (needs Docker with Compose)" \
+  "release:In Docker, with a published release image (fastest; needs Docker with Compose)" \
+  "docker:In Docker, with an image built from this source (needs Docker with Compose)" \
   "build:On this machine, built from this source (needs Go)" \
   "binary:On this machine, with an installed native-agent-api binary"
+
+# RELEASE: the published image version, or empty when Docker builds the image from source.
+RELEASE=""
+if [ "$MODE" = release ]; then
+  MODE=docker
+  latest=$(git tag --list 'v*' --sort=-v:refname 2>/dev/null | head -n 1)
+  while :; do
+    ask RELEASE "Release to run (see the GitHub releases)" "${latest#v}"
+    case $RELEASE in
+      '' | *[!0-9.]* | .* | *.) say "Enter a version such as 0.2.0." ;;
+      *) break ;;
+    esac
+  done
+fi
 
 case $MODE in
   docker)
     need docker "install Docker with Compose v2"
     docker compose version >/dev/null 2>&1 || die "Docker Compose v2 is required"
-    git rev-parse HEAD >/dev/null 2>&1 || die "the image reads its version from git: run this in a git checkout"
+    if [ -z "$RELEASE" ]; then
+      git rev-parse HEAD >/dev/null 2>&1 || die "the image reads its version from git: run this in a git checkout"
+    fi
     ;;
   build) need go "see go.mod for the version" ;;
   binary) need native-agent-api "install it with: go install ./cmd/native-agent-api" ;;
@@ -152,6 +170,7 @@ if [ "$MODE" = docker ]; then
   else
     COMPOSE_FILES=docker/compose.yaml
   fi
+  [ -z "$RELEASE" ] || COMPOSE_FILES=$COMPOSE_FILES:docker/compose.release.yaml
 else
   ask APP_ENV "Env file to write" .env
   suggested_port=8080
@@ -202,6 +221,7 @@ if [ "$MODE" = docker ]; then
   set_kv "$DOCKER_ENV" CONTAINER_APP_ENV_FILE "./$NAME.app.env"
   set_kv "$DOCKER_ENV" CONTAINER_PUBLISH_ADDR "$PUBLISH_ADDR"
   set_kv "$DOCKER_ENV" CONTAINER_PUBLISH_PORT "$PORT"
+  set_kv "$DOCKER_ENV" CONTAINER_RELEASE "$RELEASE"
   say "Wrote $DOCKER_ENV and $APP_ENV."
   URL_HOST=$PUBLISH_ADDR
 else
@@ -221,8 +241,10 @@ say "Every other setting has the value from the example; edit the file to change
 
 # ---------------------------------------------------------------- next steps
 
+# The Compose arguments: a release image is pulled, an image from source is built.
+if [ -n "$RELEASE" ]; then set -- up -d --wait; else set -- up -d --build --wait; fi
 case $MODE in
-  docker) START="docker compose --env-file $DOCKER_ENV up -d --build --wait" ;;
+  docker) START="docker compose --env-file $DOCKER_ENV $*" ;;
   build) START="make run ENV_FILE=$APP_ENV" ;;
   binary) START="native-agent-api serve --env-file $APP_ENV" ;;
 esac
@@ -248,7 +270,9 @@ If logged_in is false, log in through the API (docs/api.md, "Agent endpoints"):
 API reference: $URL/docs
 EOF
 
-if [ "$MODE" = docker ]; then
+if [ -n "$RELEASE" ]; then
+  question="Pull the image and start the container now?"
+elif [ "$MODE" = docker ]; then
   question="Build the image and start the container now?"
 else
   question="Start the gateway now? It runs in this terminal until you stop it."
@@ -256,7 +280,7 @@ fi
 if confirm "$question" y; then
   say "$D$START$N"
   case $MODE in
-    docker) exec docker compose --env-file "$DOCKER_ENV" up -d --build --wait ;;
+    docker) exec docker compose --env-file "$DOCKER_ENV" "$@" ;;
     build) exec make run ENV_FILE="$APP_ENV" ;;
     binary) exec native-agent-api serve --env-file "$APP_ENV" ;;
   esac

@@ -13,6 +13,8 @@ All notable changes to this project are documented here. The format is based on
   release steps and `gh attestation verify`.
 - Docker: `docker/compose.release.yaml` runs the published agent image of `CONTAINER_RELEASE`
   instead of building it from source.
+- `make setup` can run a published Docker image, the fastest way to start. The README quick start
+  compares the ways to run the gateway, and the agent table shows the tested CLI version.
 - The API document lists every fixed value: an `enum` for request fields (login `method`,
   `provider` options such as `permission_mode` and `reasoning_summary`, `agent.name`), and the
   values with their meaning in the description of `code`, `error.code` and `capabilities`.
