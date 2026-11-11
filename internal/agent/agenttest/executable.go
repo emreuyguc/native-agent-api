@@ -14,7 +14,7 @@ import (
 func WriteExecutable(t testing.TB, path, content string) {
 	t.Helper()
 	syscall.ForkLock.RLock()
-	err := os.WriteFile(path, []byte(content), 0o700)
+	err := os.WriteFile(path, []byte(content), 0o700) //nolint:gosec // A fake CLI must be executable; only its owner can use it.
 	syscall.ForkLock.RUnlock()
 	if err != nil {
 		t.Fatal(err)
