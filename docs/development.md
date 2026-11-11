@@ -29,7 +29,7 @@ in CI, and the checks move with the repository to another CI service.
 | `make api-diff BASE=…` | | API changes that break clients | `api` / `breaking-changes` |
 | `make fuzz FUZZTIME=…` | | New fuzz inputs; `check-pre-push` uses 10 seconds per target | `fuzz`, weekly with 2 minutes |
 | `make images` | | The Docker images, without pushing | `ci` / `docker` (amd64 and arm64) |
-| `make snapshot` | | The release archives in `dist/`, without publishing | `release` publishes them |
+| `make snapshot` | | The release archives and SBOMs in `dist/`, without publishing | `release` publishes them |
 
 `check-pre-push` compares the API with `origin/main`; pass `BASE=` for another base.
 `make hooks` makes git run `check-pre-commit` before each commit and `check-pre-push` before each
@@ -43,9 +43,9 @@ provenance and publishing of a release.
 | Tools | Version pinned in | Runs with |
 |---|---|---|
 | actionlint, oasdiff, go-test-coverage | `tools/go.mod` | `go tool` |
-| golangci-lint, GoReleaser | `tools/golangci-lint/go.mod`, `tools/goreleaser/go.mod` | `go tool`; own modules because of their dependencies |
+| golangci-lint | `tools/golangci-lint/go.mod` | `go tool`; its own module because of its dependencies |
 | govulncheck | `go.mod` | `go tool` |
-| zizmor, ShellCheck | `tools/docker/<name>/Dockerfile` (tag and digest) | Docker |
+| zizmor, ShellCheck, GoReleaser | `tools/docker/<name>/Dockerfile` (tag and digest) | Docker; the release workflow runs the same GoReleaser version |
 
 None of them changes the product's dependencies. Dependabot updates all of them.
 

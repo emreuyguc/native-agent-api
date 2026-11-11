@@ -12,9 +12,8 @@ LDFLAGS := -s -w \
 # Development tools. Go tools have their own modules in tools/; the other tools run from the image
 # in tools/docker/<name>/Dockerfile. Dependabot updates both, and CI runs the same versions.
 GOLANGCI_LINT := go tool -modfile=tools/golangci-lint/go.mod golangci-lint
-GORELEASER := go tool -modfile=tools/goreleaser/go.mod goreleaser
 TOOLS := go tool -modfile=tools/go.mod
-GO_MODULES := . tools tools/golangci-lint tools/goreleaser
+GO_MODULES := . tools tools/golangci-lint
 tool_image = $(shell sed -n 's/^FROM //p' tools/docker/$(1)/Dockerfile)
 IMAGES := claude codex edge
 
@@ -96,8 +95,12 @@ images: ## Build the Docker images without pushing (IMAGE=claude|codex|edge, PLA
 	done
 
 .PHONY: snapshot
-snapshot: ## Build the release archives into dist/ without publishing (no SBOM)
-	$(GORELEASER) release --snapshot --clean --skip=publish,sbom
+# The image may have an older Go than go.mod; GOTOOLCHAIN=auto fetches the right one into a
+# volume, so the next run reuses it.
+snapshot: ## Build the release archives and SBOMs into dist/ without publishing (GoReleaser, Docker)
+	docker run --rm -v "$(CURDIR)":/src -w /src -v native-agent-api-goreleaser:/go \
+	  -e GOTOOLCHAIN=auto -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/src \
+	  $(call tool_image,goreleaser) release --snapshot --clean --skip=publish
 
 # The two levels, named after when they run. `make hooks` makes git run them; CI runs the same
 # targets. docs/development.md lists which CI job runs which target.

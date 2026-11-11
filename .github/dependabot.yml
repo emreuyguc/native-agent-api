@@ -6,7 +6,7 @@
 version: 2
 updates:
   - package-ecosystem: gomod
-    directories: [/, /tools, /tools/golangci-lint, /tools/goreleaser]
+    directories: [/, /tools, /tools/golangci-lint]
     schedule:
       interval: weekly
     cooldown:
@@ -42,6 +42,7 @@ updates:
   # The images of the development tools that are not Go programs (tools/docker/<name>).
   - package-ecosystem: docker
     directories:
+      - /tools/docker/goreleaser
       - /tools/docker/shellcheck
       - /tools/docker/zizmor
     schedule:
