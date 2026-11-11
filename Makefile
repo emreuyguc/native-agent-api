@@ -31,17 +31,37 @@ test: ## Run tests with the race detector
 test-host: ## Run host tests against the installed CLI and its native login (AGENT=claude|codex)
 	NATIVE_AGENT_HOST_AGENT=$(AGENT) go test -tags host -count=1 -v ./internal/hosttest
 
+.PHONY: fuzz
+fuzz: ## Run every fuzz target for FUZZTIME each (for example FUZZTIME=1m)
+	@test -n "$(FUZZTIME)" || { echo "pass FUZZTIME=<duration>, for example FUZZTIME=1m"; exit 1; }
+	@for pkg in $$(go list ./...); do \
+	  for target in $$(go test -list '^Fuzz' "$$pkg" | grep '^Fuzz'); do \
+	    echo "$$pkg $$target"; \
+	    go test -run '^$$' -fuzz "^$$target$$" -fuzztime "$(FUZZTIME)" "$$pkg" || exit 1; \
+	  done; \
+	done
+
 .PHONY: tidy
-tidy: ## Verify module metadata
+tidy: ## Verify module metadata of the product and of tools/
 	go mod tidy
 	go mod verify
+	cd tools && go mod tidy && go mod verify
+
+.PHONY: lint-workflows
+lint-workflows: ## Check the GitHub Actions workflows
+	go tool -modfile=tools/go.mod actionlint
 
 .PHONY: vuln
 vuln: ## Scan Go dependencies for known vulnerabilities
 	go tool govulncheck ./...
 
+.PHONY: api-diff
+api-diff: ## List API changes that break clients, against BASE (for example BASE=origin/main)
+	@test -n "$(BASE)" || { echo "pass BASE=<revision>, for example BASE=origin/main"; exit 1; }
+	scripts/api-diff.sh "$(BASE)"
+
 .PHONY: check
-check: tidy lint test vuln ## Run all repository checks
+check: tidy lint lint-workflows test vuln ## Run all repository checks
 
 .PHONY: build
 build: ## Build the local binary

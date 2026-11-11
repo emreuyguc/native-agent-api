@@ -60,7 +60,7 @@ other need separate gateways.
 | Filesystem | Paths reject absolute, `..`, NUL, backslash and symlinks; every operation runs on an `os.Root`; only single-link regular files are opened, without blocking; atomic uploads; entry limits on delete and copy |
 | Native options | Strict per-adapter schemas; gateway-owned keys (sandbox, approval, config paths) rejected. Plugins, MCP, hooks and native controls act with the client's authority, which already includes starting commands. The agent cannot call them: the CLI sandbox blocks loopback to the gateway |
 | Secrets in output | Tokens redacted in errors and debug output; body logging off by default, never for file transfers or login |
-| Releases | Binaries and images built only by the release workflow from a version tag after the checks; signed build provenance (Sigstore), SBOM and checksums; pinned actions and base images |
+| Supply chain | Binaries and images built only by the release workflow from a version tag after the checks; signed build provenance (Sigstore), SBOM and checksums; pinned actions and base images. Workflows checked by actionlint and zizmor; pull requests cannot add a dependency with a known high vulnerability; OpenSSF Scorecard weekly |
 | Container | Non-root UID, read-only root filesystem, no capabilities, `no-new-privileges`, PID limit, bounded tmpfs, pinned CLI checksums. The container gets only the application env file, never the Docker env file (`docker/verify.sh` checks it). Optional egress overlay: no route or external DNS, only allowlisted hosts through a proxy |
 
 ## Protections with regression tests
@@ -70,8 +70,8 @@ CLI: `make test-host AGENT=claude|codex`.
 
 | ID | Attack | Protection | Test |
 |---|---|---|---|
-| F-1 | DNS rebinding: without a token on loopback, a web page starts a `bypass` run | Without a token, only IP and `localhost` Host names are served | `TestBrowserGuard` |
-| F-2 | Cross-site form post: a web page logs out, starts a login, creates a workspace or cancels a run | Cross-origin state changes are rejected in every mode | `TestBrowserGuard` |
+| F-1 | DNS rebinding: without a token on loopback, a web page starts a `bypass` run | Without a token, only IP and `localhost` Host names are served | `TestBrowserGuard`, `FuzzLiteralHost` |
+| F-2 | Cross-site form post: a web page logs out, starts a login, creates a workspace or cancels a run | Cross-origin state changes are rejected in every mode | `TestBrowserGuard`, `FuzzCrossOrigin` |
 | F-3 | Flag injection: `allowed_tools: ["--settings={...}"]` becomes a Claude flag and overrides the sandbox | Tool rules never start with `-` | `TestParseOptionsRejectsUnsafeOrInvalidValues` |
 | F-4 | A FIFO in the workspace makes download or copy hang forever | Files open with `O_NONBLOCK`; only single-link regular files are served | `TestSpecialFilesNeverBlock` |
 | F-5 | A parent swapped for a symlink between check and use escapes the workspace | Every operation runs on an `os.Root` of the workspace | `TestSwappedParentCannotEscape` |

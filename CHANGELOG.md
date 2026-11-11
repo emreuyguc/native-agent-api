@@ -6,11 +6,21 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-11
+
+The first release with downloadable binaries and Docker images, a simpler Docker setup and an
+API document that lists every fixed value. A Docker installation of 0.1.0 needs the upgrade
+steps in `docker/README.md`.
+
 ### Added
 
 - Releases: a version tag publishes the binaries for linux and darwin (amd64, arm64) on GitHub and
   the images on GHCR, with an SBOM and signed build provenance. `docs/releasing.md` describes the
   release steps and `gh attestation verify`.
+- Docker: `docker/compose.release.yaml` runs the published agent image of `CONTAINER_RELEASE`
+  instead of building it from source.
+- `make setup` can run a published Docker image, the fastest way to start. The README quick start
+  compares the ways to run the gateway, and the agent table shows the tested CLI version.
 - The API document lists every fixed value: an `enum` for request fields (login `method`,
   `provider` options such as `permission_mode` and `reasoning_summary`, `agent.name`), and the
   values with their meaning in the description of `code`, `error.code` and `capabilities`.
@@ -22,6 +32,8 @@ All notable changes to this project are documented here. The format is based on
 
 ### Changed
 
+- Request fields with fixed values declare them as an `enum` in the API document. The gateway
+  already rejected other values, but a client generated from the document can change.
 - The API document groups operations by task (`login`, `ask`, `permissions`, `native control`
   are new groups) and names each one in a few words, such as "Start login". The former one-line
   summary starts the description. Operation IDs and paths are unchanged.
@@ -41,6 +53,8 @@ All notable changes to this project are documented here. The format is based on
 
 ### Security
 
+- Without a token, the browser guard rejects a malformed `Host` header, such as `[:::` or a
+  non-numeric port, instead of reading an IP address from it. A new fuzz test found it.
 - Go 1.27.4, which fixes GO-2026-6859 in `net/http`. The Docker build image is pinned to it.
 
 ## [0.1.0] - 2026-11-07
@@ -84,5 +98,6 @@ First public release.
   configuration.
 - Optional hardened Docker setup per agent, with resource limits and an egress-controlled variant.
 
-[Unreleased]: https://github.com/emreuyguc/native-agent-api/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/emreuyguc/native-agent-api/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/emreuyguc/native-agent-api/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/emreuyguc/native-agent-api/releases/tag/v0.1.0

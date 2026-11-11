@@ -1,0 +1,62 @@
+name: Bug report
+description: The gateway does something wrong or fails.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Never paste real tokens, credentials or private file contents. Report a vulnerability
+        privately: see SECURITY.md.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The requests or commands, for example the curl calls.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Gateway version
+      description: Output of `native-agent-api version`; `GET /v1/agent` shows it too.
+    validations:
+      required: true
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Agent
+      options: [claude, codex]
+    validations:
+      required: true
+  - type: input
+    id: cli
+    attributes:
+      label: CLI version
+      description: "`cli.version` of `GET /v1/agent`, or the output of `claude --version` or `codex --version`."
+    validations:
+      required: true
+  - type: dropdown
+    id: run
+    attributes:
+      label: How the gateway runs
+      options:
+        - Docker
+        - Docker with restricted egress
+        - Binary on macOS
+        - Binary on Linux
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Gateway log
+      description: The relevant lines. `NATIVE_AGENT_LOG_LEVEL=debug` adds detail.
+      render: text

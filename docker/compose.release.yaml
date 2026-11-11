@@ -1,0 +1,9 @@
+# Published images (docs/releasing.md). Add it after compose.yaml in COMPOSE_FILE to run a release
+# from GHCR instead of building the agent image from source; CONTAINER_RELEASE selects the version.
+# The edge image of compose.egress.yaml is still built from source.
+
+services:
+  agent:
+    build: !reset null
+    image: ghcr.io/emreuyguc/native-agent-api-${CONTAINER_AGENT:?CONTAINER_AGENT is required}:${CONTAINER_RELEASE:?CONTAINER_RELEASE is required with compose.release.yaml}
+    pull_policy: missing

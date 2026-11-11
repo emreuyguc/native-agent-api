@@ -6,6 +6,7 @@ import (
 	"crypto/subtle"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/netip"
 	"regexp"
@@ -106,16 +107,18 @@ func (s *Server) browserGuard(next http.Handler) http.Handler {
 	})
 }
 
-// literalHost accepts an IP address or localhost: names a web page cannot rebind.
+// literalHost accepts an IP address or localhost, with an optional numeric port: names a web page
+// cannot rebind. Anything that does not parse as host and port, or as a bare host, is rejected.
 func literalHost(host string) bool {
-	if addr, err := netip.ParseAddrPort(host); err == nil {
-		return addr.Addr().IsValid()
-	}
 	name := host
-	if index := strings.LastIndexByte(host, ':'); index >= 0 && !strings.Contains(host[index:], "]") {
-		name = host[:index]
+	if split, port, err := net.SplitHostPort(host); err == nil {
+		if strings.Trim(port, "0123456789") != "" {
+			return false
+		}
+		name = split
+	} else if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
+		name = host[1 : len(host)-1]
 	}
-	name = strings.TrimSuffix(strings.TrimPrefix(name, "["), "]")
 	if _, err := netip.ParseAddr(name); err == nil {
 		return true
 	}
