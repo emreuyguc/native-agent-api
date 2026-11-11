@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+
+- Releases: the release workflow publishes nothing until every archive and image passes
+  verification. It accepts only `vX.Y.Z` and `vX.Y.Z-rc.N` tags on `main`. A release candidate
+  becomes a pre-release. The images no longer get a `latest` tag.
+
 ## [0.2.0] - 2026-11-11
 
 The first release with downloadable binaries and Docker images, a simpler Docker setup and an

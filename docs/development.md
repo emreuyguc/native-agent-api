@@ -29,10 +29,9 @@ cache for the images.
 
 | Target | Checks | CI job |
 |---|---|---|
-| `verify-modules`, `lint-go`, `lint-workflows`, `check-coverage`, `scan-vulnerabilities`, `lint-scripts` | Modules, Go lint, workflow lint, tests and coverage, known vulnerabilities, shell scripts | `ci` / `check` |
+| `verify-modules`, `lint-go`, `lint-workflows`, `check-coverage`, `scan-vulnerabilities`, `lint-scripts`, `check-release-config` | Modules, Go lint, workflow lint, tests and coverage, known vulnerabilities, shell scripts, `.goreleaser.yaml` | `ci` / `check` |
 | `audit-workflows` | Workflow security (zizmor) | `ci` / `workflows` |
 | `check-api-compatibility BASE=…` | API changes that break clients | `api` / `breaking-changes` |
-| `check-release-config` | `.goreleaser.yaml` | `release` |
 | `test-fuzz FUZZTIME=…` | New fuzz inputs; `check-all` uses 10 seconds per target | `fuzz`, weekly with 2 minutes |
 | `build-images` | The Docker images, without pushing | `ci` / `docker` (amd64 and arm64) |
 | `build-release-snapshot` | The release archives and SBOMs in `dist/`, without publishing | `release` publishes them |
