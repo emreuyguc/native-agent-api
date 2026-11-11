@@ -10,6 +10,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/emreuyguc/native-agent-api/internal/agent/agenttest"
 )
 
 // The fake native CLIs run as this test binary (see fakeBinary). Both answer every prompt
@@ -35,9 +37,7 @@ func fakeBinary(t *testing.T, provider string) string {
 	path := filepath.Join(dir, provider)
 	script := "#!/bin/sh\nFAKE_PROVIDER=" + provider + " FAKE_STATE=" + quote(state) +
 		" exec " + quote(executable) + " -test.run '^TestFakeNativeCLI$' -- \"$@\"\n"
-	if err := os.WriteFile(path, []byte(script), 0o700); err != nil {
-		t.Fatal(err)
-	}
+	agenttest.WriteExecutable(t, path, script)
 
 	return path
 }

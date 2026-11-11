@@ -1,9 +1,10 @@
 package claude_test
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/emreuyguc/native-agent-api/internal/agent/agenttest"
 )
 
 // SuccessScript emulates `claude -p --input-format stream-json`: one turn per stdin line
@@ -20,9 +21,7 @@ done
 func FakeCLI(t *testing.T, script string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "claude")
-	if err := os.WriteFile(path, []byte(script), 0o700); err != nil {
-		t.Fatal(err)
-	}
+	agenttest.WriteExecutable(t, path, script)
 
 	return path
 }

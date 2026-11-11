@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/emreuyguc/native-agent-api/internal/agent"
+	"github.com/emreuyguc/native-agent-api/internal/agent/agenttest"
 	"github.com/emreuyguc/native-agent-api/internal/agent/codex"
 )
 
@@ -29,9 +30,7 @@ case "$1" in
   *) echo "unexpected command" >&2; exit 8 ;;
 esac
 `
-	if err := os.WriteFile(binary, []byte(script), 0o700); err != nil {
-		t.Fatal(err)
-	}
+	agenttest.WriteExecutable(t, binary, script)
 	t.Setenv("NATIVE_AGENT_TEST_SECRET", "must-not-leak")
 	adapter, err := codex.New(codex.Options{
 		Binary: binary, ProfileDir: filepath.Join(root, "config"), HomeDir: root, User: "agent",
@@ -353,9 +352,7 @@ func TestStartupFailureReportsAppServerError(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	binary := filepath.Join(root, "codex-test")
-	if err := os.WriteFile(binary, []byte("#!/bin/sh\necho 'invalid config sk-ant-secret' >&2\nexit 3\n"), 0o700); err != nil {
-		t.Fatal(err)
-	}
+	agenttest.WriteExecutable(t, binary, "#!/bin/sh\necho 'invalid config sk-ant-secret' >&2\nexit 3\n")
 	adapter, err := codex.New(codex.Options{
 		Binary: binary, ProfileDir: filepath.Join(root, "config"), HomeDir: root, User: "agent",
 		WorkDir: root, TempDir: root, Path: "/usr/bin:/bin", MaxOutputBytes: 1 << 20,
@@ -383,9 +380,7 @@ func helperBinary(t *testing.T, root string) string {
 	quote := func(value string) string { return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'" }
 	path := filepath.Join(root, "codex-app-server-test")
 	script := "#!/bin/sh\nexec " + quote(executable) + " -test.run '^TestCodexAppServerHelper$' -- \"$@\"\n"
-	if err := os.WriteFile(path, []byte(script), 0o700); err != nil {
-		t.Fatal(err)
-	}
+	agenttest.WriteExecutable(t, path, script)
 
 	return path
 }
