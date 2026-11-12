@@ -1,7 +1,9 @@
 name: release
 
 # A version tag releases the binaries on GitHub and the images on GHCR, each with a signed build
-# provenance attestation. docs/releasing.md describes the steps.
+# provenance attestation. Nothing becomes public before every part is verified: the release stays
+# a draft and the images carry no version tag until the verify job passes. docs/releasing.md
+# describes the steps.
 on:
   push:
     tags: ["v*"]
@@ -12,17 +14,58 @@ concurrency:
   group: release-${{ github.ref_name }}
 
 jobs:
+  # A release needs a vX.Y.Z or vX.Y.Z-rc.N tag on a commit of main, and release notes.
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
+      minor: ${{ steps.tag.outputs.minor }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: tag
+        name: Check the tag
+        run: |
+          if ! printf '%s\n' "$GITHUB_REF_NAME" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-rc\.[1-9][0-9]*)?$'; then
+            echo "::error::$GITHUB_REF_NAME is not vX.Y.Z or vX.Y.Z-rc.N"
+            exit 1
+          fi
+          version=${GITHUB_REF_NAME#v}
+          echo "version=$version" >>"$GITHUB_OUTPUT"
+          # A release candidate gets only its own tag, never the moving X.Y tag.
+          case $version in
+            *-rc.*) echo "minor=" >>"$GITHUB_OUTPUT" ;;
+            *) echo "minor=${version%.*}" >>"$GITHUB_OUTPUT" ;;
+          esac
+      - name: Check that the tagged commit is on main
+        run: |
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_SHA is not on main"
+            exit 1
+          fi
+      - name: Check the release notes
+        run: scripts/release-notes.sh "$GITHUB_REF_NAME"
+
   check:
+    needs: prepare
     # actionlint does not know the $/ syntax yet.
     uses: ./.github/workflows/ci.yml # zizmor: ignore[self-repository]
     permissions:
       contents: read
 
+  # GoReleaser creates the release as a draft (.goreleaser.yaml); verify publishes it.
   binaries:
-    runs-on: ubuntu-latest
-    needs: check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: [prepare, check]
     permissions:
-      contents: write # create the GitHub release
+      contents: write # create the draft release
       id-token: write # sign the attestation with Sigstore
       attestations: write
     steps:
@@ -49,16 +92,93 @@ jobs:
           args: release --clean --release-notes ${{ runner.temp }}/notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+          # The pushed tag. Without it GoReleaser picks the highest tag on the commit, and git
+          # sorts v0.2.1-rc.1 above v0.2.1: a release after its candidate would update the
+          # candidate's release.
+          GORELEASER_CURRENT_TAG: ${{ github.ref_name }}
+      - id: attest
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-checksums: dist/checksums.txt
+      # The Sigstore bundle of the attestation, as a release file: it verifies without the GitHub
+      # attestation API, and OpenSSF Scorecard finds a signed release by it.
+      - name: Add the attestation bundle to the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          cp "$BUNDLE" "$RUNNER_TEMP/checksums.txt.sigstore.json"
+          gh release upload "$GITHUB_REF_NAME" "$RUNNER_TEMP/checksums.txt.sigstore.json" --repo "$GITHUB_REPOSITORY"
 
+  # Each image builds once per architecture on a native runner, without QEMU, and is pushed by
+  # digest only.
   images:
-    runs-on: ubuntu-latest
-    needs: check
+    name: images (${{ matrix.image }}, ${{ matrix.arch }})
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    timeout-minutes: 30
+    needs: [prepare, check]
     permissions:
       contents: read
       packages: write # push to GHCR
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [claude, codex, edge]
+        arch: [amd64, arm64]
+    env:
+      IMAGE: ghcr.io/${{ github.repository_owner }}/native-agent-api-${{ matrix.image }}
+    steps:
+      # The Dockerfiles read the version from git, so the tags must be present.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # Only the OCI labels are used here; verify sets the tags. No `latest` tag.
+      - id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: latest=false
+          tags: type=semver,pattern={{version}}
+      - id: build
+        name: Push ${{ matrix.image }} image by digest (${{ matrix.arch }})
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: docker/${{ matrix.image }}/Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          labels: ${{ steps.meta.outputs.labels }}
+          sbom: true
+          provenance: mode=max
+      - name: Record the digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/platforms"
+          printf '%s\n' "$DIGEST" >"$RUNNER_TEMP/platforms/$ARCH"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: platform-${{ matrix.image }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/platforms/${{ matrix.arch }}
+          if-no-files-found: error
+          retention-days: 1
+
+  # Joins the two architectures of each image into one index, pushed by digest only, and signs it.
+  manifest:
+    name: manifest (${{ matrix.image }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    needs: images
+    permissions:
+      packages: write # push the index to GHCR
       id-token: write # sign the attestation with Sigstore
       attestations: write
     strategy:
@@ -68,39 +188,110 @@ jobs:
     env:
       IMAGE: ghcr.io/${{ github.repository_owner }}/native-agent-api-${{ matrix.image }}
     steps:
-      # The Dockerfiles read the version from git, so the tags must be present.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+          pattern: platform-${{ matrix.image }}-*
+          path: ${{ runner.temp }}/platforms
+          merge-multiple: true
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - id: meta
-        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
-        with:
-          images: ${{ env.IMAGE }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-      - id: build
-        name: Push ${{ matrix.image }} image (amd64 + arm64)
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          file: docker/${{ matrix.image }}/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          sbom: true
-          provenance: mode=max
+      # `imagetools create` pushes only to a tag or a digest. The dry run prints the index with a
+      # trailing newline; without it, its digest is the digest of the pushed index.
+      - id: index
+        name: Push the ${{ matrix.image }} index by digest
+        run: |
+          cd "$RUNNER_TEMP/platforms"
+          set -- "$IMAGE@$(cat amd64)" "$IMAGE@$(cat arm64)"
+          docker buildx imagetools create --dry-run "$@" >index.json
+          digest=sha256:$(printf '%s' "$(cat index.json)" | sha256sum | cut -d' ' -f1)
+          docker buildx imagetools create --metadata-file meta.json --tag "$IMAGE@$digest" "$@"
+          pushed=$(jq -r '."containerimage.descriptor".digest' meta.json)
+          if [ "$pushed" != "$digest" ]; then
+            echo "::error::pushed $pushed, expected $digest"
+            exit 1
+          fi
+          echo "digest=$digest" >>"$GITHUB_OUTPUT"
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-name: ${{ env.IMAGE }}
-          subject-digest: ${{ steps.build.outputs.digest }}
+          subject-digest: ${{ steps.index.outputs.digest }}
           push-to-registry: true
+      - name: Record the digest
+        env:
+          DIGEST: ${{ steps.index.outputs.digest }}
+          NAME: ${{ matrix.image }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          printf '%s\n' "$DIGEST" >"$RUNNER_TEMP/digests/$NAME"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: digest-${{ matrix.image }}
+          path: ${{ runner.temp }}/digests/${{ matrix.image }}
+          if-no-files-found: error
+          retention-days: 1
+
+  # Verifies every archive and image against this run, then tags the images and publishes the
+  # release. Until then the release is a draft and the images have no version tag.
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    needs: [prepare, binaries, manifest]
+    permissions:
+      contents: write # read the draft release and publish it
+      packages: write # add the version tags to the images
+      attestations: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      OWNER: ${{ github.repository_owner }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+      MINOR: ${{ needs.prepare.outputs.minor }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: digest-*
+          path: ${{ runner.temp }}/digests
+          merge-multiple: true
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify the archives
+        run: |
+          mkdir -p "$RUNNER_TEMP/assets" && cd "$RUNNER_TEMP/assets"
+          gh release download "$GITHUB_REF_NAME" --repo "$REPO"
+          sha256sum -c checksums.txt
+          for archive in *.tar.gz; do
+            gh attestation verify "$archive" --repo "$REPO" \
+              --signer-workflow "$REPO/.github/workflows/release.yml" \
+              --source-ref "$GITHUB_REF" --source-digest "$GITHUB_SHA" --deny-self-hosted-runners
+          done
+      - name: Verify the images
+        run: |
+          for file in "$RUNNER_TEMP"/digests/*; do
+            image="ghcr.io/$OWNER/native-agent-api-$(basename "$file")@$(cat "$file")"
+            gh attestation verify "oci://$image" --repo "$REPO" \
+              --signer-workflow "$REPO/.github/workflows/release.yml" \
+              --source-ref "$GITHUB_REF" --source-digest "$GITHUB_SHA" --deny-self-hosted-runners
+            platforms=$(docker buildx imagetools inspect "$image" --format '{{json .Manifest}}' |
+              jq -r '[.manifests[] | select(.platform.os != "unknown") | "\(.platform.os)/\(.platform.architecture)"] | sort | join(",")')
+            if [ "$platforms" != "linux/amd64,linux/arm64" ]; then
+              echo "::error::$image has platforms '$platforms'"
+              exit 1
+            fi
+          done
+      - name: Tag the images
+        run: |
+          for file in "$RUNNER_TEMP"/digests/*; do
+            name="ghcr.io/$OWNER/native-agent-api-$(basename "$file")"
+            set -- --tag "$name:$VERSION"
+            if [ -n "$MINOR" ]; then set -- "$@" --tag "$name:$MINOR"; fi
+            docker buildx imagetools create "$@" "$name@$(cat "$file")"
+          done
+      - name: Publish the release
+        run: gh release edit "$GITHUB_REF_NAME" --repo "$REPO" --draft=false

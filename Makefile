@@ -42,15 +42,22 @@ check-coverage: test ## Check the test coverage against .testcoverage.yml; write
 	@status=0; $(TOOLS) go-test-coverage --config=.testcoverage.yml >coverage.txt || status=$$?; \
 	  cat coverage.txt; exit $$status
 
+# The fuzz workflow runs one job per line.
+.PHONY: list-fuzz-targets
+list-fuzz-targets: ## List the fuzz targets, one "<package> <target>" per line
+	@for pkg in $$(go list ./...); do \
+	  go test -list '^Fuzz' "$$pkg" | sed -n "s|^Fuzz|$$pkg Fuzz|p"; \
+	done
+
 .PHONY: test-host
 test-host: ## Run host tests against the installed CLI and its native login (AGENT=claude|codex)
 	NATIVE_AGENT_HOST_AGENT=$(AGENT) go test -tags host -count=1 -v ./internal/hosttest
 
 .PHONY: test-fuzz
-test-fuzz: ## Run every fuzz target for FUZZTIME each (for example FUZZTIME=1m)
+test-fuzz: ## Run every fuzz target for FUZZTIME each (FUZZ_PKG=<package> FUZZ_TARGET=<name> pick one)
 	@test -n "$(FUZZTIME)" || { echo "pass FUZZTIME=<duration>, for example FUZZTIME=1m"; exit 1; }
-	@for pkg in $$(go list ./...); do \
-	  for target in $$(go test -list '^Fuzz' "$$pkg" | grep '^Fuzz'); do \
+	@for pkg in $$(go list $(or $(FUZZ_PKG),./...)); do \
+	  for target in $$(go test -list '^$(or $(FUZZ_TARGET),Fuzz.*)$$' "$$pkg" | grep '^Fuzz'); do \
 	    echo "$$pkg $$target"; \
 	    go test -run '^$$' -fuzz "^$$target$$" -fuzztime "$(FUZZTIME)" "$$pkg" || exit 1; \
 	  done; \
@@ -80,6 +87,20 @@ lint-scripts: ## Check the shell scripts (ShellCheck, Docker)
 	docker run --rm -v "$(CURDIR)":/src:ro -w /src $(call tool_image,shellcheck) \
 	  $$(git ls-files '*.sh' .githooks)
 
+# Only the packages linked into the binary: the development tools in tools/ never ship, and some
+# of them are GPL. Permissive licenses and MPL-2.0 are compatible with Apache-2.0.
+ALLOWED_LICENSES := MIT,BSD-2-Clause,BSD-3-Clause,Apache-2.0,ISC,MPL-2.0,0BSD,Unlicense
+.PHONY: check-licenses
+check-licenses: ## Check that every package in the binary has an allowed license (go-licenses)
+	$(TOOLS) go-licenses check ./... --allowed_licenses=$(ALLOWED_LICENSES) --logtostderr=false --stderrthreshold=ERROR
+
+.PHONY: lint-dockerfiles
+lint-dockerfiles: ## Check the Dockerfiles (Hadolint, Docker)
+	@for file in $$(git ls-files '*Dockerfile'); do \
+	  echo "$$file"; \
+	  docker run --rm -i $(call tool_image,hadolint) <"$$file" || exit 1; \
+	done
+
 .PHONY: scan-vulnerabilities
 scan-vulnerabilities: ## Scan Go dependencies for known vulnerabilities
 	go tool govulncheck ./...
@@ -96,6 +117,32 @@ build-images: ## Build the Docker images without pushing (IMAGE=claude|codex|edg
 	  docker buildx build --file docker/$$image/Dockerfile $(if $(PLATFORMS),--platform $(PLATFORMS),) . || exit 1; \
 	done
 
+.PHONY: check-cli-releases
+check-cli-releases: ## Fail when an agent CLI pin is behind a release older than 14 days (network)
+	scripts/check-cli-releases.sh
+
+.PHONY: test-image
+test-image: ## Build and smoke-test one agent image without a login (AGENT=claude|codex; NO_BUILD=1 tests the built image)
+	@test -n "$(AGENT)" || { echo "pass AGENT=claude or AGENT=codex"; exit 1; }
+	docker/test-image.sh "$(AGENT)" $(if $(NO_BUILD),--no-build,)
+
+# Grype reads each image from a `docker save` archive, so it needs no access to the Docker
+# daemon. Its vulnerability database stays in a volume between runs. SARIF=<dir> also writes one
+# SARIF file per image.
+.PHONY: scan-images
+scan-images: ## Scan local images for fixed high or critical vulnerabilities (SCAN="<image> ...", Grype)
+	@test -n "$(SCAN)" || { echo "pass SCAN=\"<image> ...\", for example SCAN=native-agent-api-claude:local"; exit 1; }
+	@archive=$$(mktemp) && trap 'rm -f "$$archive"' EXIT && failed="" && \
+	for image in $(SCAN); do \
+	  echo "image $$image"; \
+	  name=$$(printf '%s' "$$image" | tr -c 'A-Za-z0-9._-' '_'); \
+	  docker save "$$image" -o "$$archive" || exit 1; \
+	  docker run --rm -v "$$archive":/scan/image.tar:ro -v native-agent-api-grype:/cache -e GRYPE_DB_CACHE_DIR=/cache \
+	    $(if $(SARIF),-v "$(abspath $(SARIF))":/out,) $(call tool_image,grype) docker-archive:/scan/image.tar \
+	    --only-fixed --fail-on high -o table $(if $(SARIF),-o sarif=/out/$$name.sarif,) || failed="$$failed $$image"; \
+	done; \
+	test -z "$$failed" || { echo "vulnerable:$$failed"; exit 1; }
+
 .PHONY: build-release-snapshot
 # The image may have an older Go than go.mod; GOTOOLCHAIN=auto fetches the right one into a
 # volume, so the next run reuses it.
@@ -111,11 +158,11 @@ check-release-config: ## Validate .goreleaser.yaml (GoReleaser, Docker)
 # Three levels. The git hooks run the first two; check-all adds the slow builds that CI runs on
 # every pull request. docs/development.md lists which CI job runs which target.
 .PHONY: check-pre-commit
-check-pre-commit: verify-modules lint-go lint-workflows check-coverage scan-vulnerabilities ## Before a commit: Go checks, tests and coverage (needs only Go)
+check-pre-commit: verify-modules lint-go lint-workflows check-coverage scan-vulnerabilities check-licenses ## Before a commit: Go checks, tests, coverage and licenses (needs only Go)
 	@echo "check-pre-commit: OK"
 
 .PHONY: check-pre-push
-check-pre-push: check-pre-commit audit-workflows lint-scripts check-api-compatibility check-release-config ## Before a push: adds workflow, script, API and release checks (needs Docker)
+check-pre-push: check-pre-commit audit-workflows lint-scripts lint-dockerfiles check-api-compatibility check-release-config ## Before a push: adds workflow, script, Dockerfile, API and release checks (needs Docker)
 	@echo "check-pre-push: OK"
 
 .PHONY: check-all

@@ -1,6 +1,8 @@
 name: fuzz
 
-# Every fuzz test searches for new failing inputs. A failure uploads the input Go saved under
+# Every fuzz test searches for new failing inputs, one job per target. `make list-fuzz-targets`
+# finds the targets, so a new one joins without a change here. Each job keeps the inputs it found
+# in a cache and starts the next week from them. A failure uploads the input Go saved under
 # testdata/fuzz/; docs/testing.md says how to keep it.
 on:
   schedule:
@@ -11,8 +13,11 @@ permissions:
   contents: read
 
 jobs:
-  fuzz:
-    runs-on: ubuntu-latest
+  targets:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -20,11 +25,44 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - name: Fuzz each target for two minutes
-        run: make test-fuzz FUZZTIME=2m
+      - id: list
+        run: |
+          matrix=$(make -s list-fuzz-targets | jq -Rcs '
+            [split("\n")[] | select(length > 0) | split(" ") as [$pkg, $target]
+              | {pkg: $pkg, target: $target, name: "\($pkg | split("/") | last)-\($target)"}]')
+          echo "matrix=$matrix" >>"$GITHUB_OUTPUT"
+
+  fuzz:
+    needs: targets
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.targets.outputs.matrix) }}
+    name: fuzz (${{ matrix.name }})
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - id: corpus
+        run: echo "dir=$(go env GOCACHE)/fuzz" >>"$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.corpus.outputs.dir }}
+          key: fuzz-${{ matrix.name }}-${{ github.run_id }}
+          restore-keys: fuzz-${{ matrix.name }}-
+      - name: Fuzz ${{ matrix.target }} for ten minutes
+        env:
+          PKG: ${{ matrix.pkg }}
+          TARGET: ${{ matrix.target }}
+        run: make test-fuzz FUZZTIME=10m FUZZ_PKG="$PKG" FUZZ_TARGET="$TARGET"
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: fuzz-inputs
+          name: fuzz-inputs-${{ matrix.name }}
           path: "**/testdata/fuzz/**"
           if-no-files-found: ignore

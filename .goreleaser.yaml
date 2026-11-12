@@ -35,3 +35,8 @@ checksum:
 # No `changelog.disable`: it also skips `--release-notes`, and the release then has no notes.
 release:
   name_template: "{{ .Tag }}"
+  # The release workflow verifies every asset, then publishes the draft.
+  draft: true
+  replace_existing_draft: true
+  # A vX.Y.Z-rc.N tag becomes a pre-release.
+  prerelease: auto

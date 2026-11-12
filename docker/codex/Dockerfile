@@ -48,14 +48,16 @@ RUN set -eu; \
     tar -xzf codex.tar.gz -C package; \
     test -x package/bin/codex
 
-FROM alpine:3.24.3@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
+FROM alpine:3.24.3@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS runtime
 LABEL org.opencontainers.image.title="native-agent-api-codex" \
       org.opencontainers.image.description="native-agent-api with the native Codex CLI package"
 # bash: Claude Code's Bash tool accepts only bash or zsh, and Codex prefers bash over sh.
 # git: both CLIs use it to find the repository root, diffs and history. Projects that need more
-# (language toolchains) extend this image. Packages come from the pinned Alpine release branch.
+# (language toolchains) extend this image. Packages come from the pinned Alpine release branch;
+# `apk upgrade` also brings the base image packages to its latest security fixes.
 # hadolint ignore=DL3018
-RUN apk add --no-cache bash git \
+RUN apk upgrade --no-cache \
+    && apk add --no-cache bash git \
     && addgroup -S -g 65532 runner \
     && adduser -S -D -H -u 65532 -G runner -h /home/runner -s /bin/bash runner \
     && mkdir -p /home/runner/.codex /data /projects /tmp /opt/codex \

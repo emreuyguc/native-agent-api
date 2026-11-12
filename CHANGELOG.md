@@ -6,6 +6,32 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- Releases: `checksums.txt.sigstore.json` holds the signed build provenance of the archives.
+  `gh attestation verify <archive> --bundle checksums.txt.sigstore.json` checks it without the
+  GitHub attestation API.
+
+### Changed
+
+- Releases: each image builds on a native amd64 or arm64 runner.
+
+## [0.2.1] - 2026-11-12
+
+A security release: the images no longer contain the critical zlib vulnerability CVE-2026-4738.
+Releases are now published only after every archive and image passes verification.
+
+### Changed
+
+- Releases: the release workflow publishes nothing until every archive and image passes
+  verification. It accepts only `vX.Y.Z` and `vX.Y.Z-rc.N` tags on `main`. A release candidate
+  becomes a pre-release. The images no longer get a `latest` tag.
+
+### Security
+
+- Images: the build upgrades the Alpine packages of the base image. The 0.2.0 images contain
+  zlib 1.3.2-r1 with CVE-2026-4738 (critical); a rebuilt image has 1.4-r0.
+
 ## [0.2.0] - 2026-11-11
 
 The first release with downloadable binaries and Docker images, a simpler Docker setup and an
@@ -98,6 +124,7 @@ First public release.
   configuration.
 - Optional hardened Docker setup per agent, with resource limits and an egress-controlled variant.
 
-[Unreleased]: https://github.com/emreuyguc/native-agent-api/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/emreuyguc/native-agent-api/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/emreuyguc/native-agent-api/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/emreuyguc/native-agent-api/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/emreuyguc/native-agent-api/releases/tag/v0.1.0
