@@ -33,7 +33,8 @@ The workflow runs these jobs in order. Nothing is public until `verify` passes.
 | `prepare` | Fails unless the tag is `vX.Y.Z` or `vX.Y.Z-rc.N`, its commit is on `main` and `CHANGELOG.md` has a section for it |
 | `check` | Runs every job of `ci.yml` |
 | `binaries` | Creates the GitHub release as a draft with the archives, SBOMs and `checksums.txt`, and attests the archives |
-| `images` | Pushes each image by digest only, without a tag, and attests it |
+| `images` | Builds each image once per architecture on a native amd64 or arm64 runner and pushes it by digest only, without a tag |
+| `manifest` | Joins the two architectures of each image into one index, pushes it by digest only and attests it |
 | `verify` | Checks `checksums.txt`, the attestation of every archive and image, and the two image platforms. Then it adds the image tags and publishes the release |
 
 A failed run leaves a draft release and untagged images. Delete the draft, fix the cause and push
