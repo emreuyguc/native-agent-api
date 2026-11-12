@@ -96,9 +96,19 @@ jobs:
           # sorts v0.2.1-rc.1 above v0.2.1: a release after its candidate would update the
           # candidate's release.
           GORELEASER_CURRENT_TAG: ${{ github.ref_name }}
-      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+      - id: attest
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-checksums: dist/checksums.txt
+      # The Sigstore bundle of the attestation, as a release file: it verifies without the GitHub
+      # attestation API, and OpenSSF Scorecard finds a signed release by it.
+      - name: Add the attestation bundle to the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          cp "$BUNDLE" "$RUNNER_TEMP/checksums.txt.sigstore.json"
+          gh release upload "$GITHUB_REF_NAME" "$RUNNER_TEMP/checksums.txt.sigstore.json" --repo "$GITHUB_REPOSITORY"
 
   # Each image builds once per architecture on a native runner, without QEMU, and is pushed by
   # digest only.

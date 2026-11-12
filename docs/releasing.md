@@ -5,9 +5,9 @@ the checks of `ci.yml`, builds every part, verifies it, and only then publishes:
 
 | Output | Where | Contents |
 |---|---|---|
-| Binaries | GitHub release of the tag | `tar.gz` per platform (linux and darwin, amd64 and arm64), an SBOM per archive, `checksums.txt` |
-| Images | `ghcr.io/emreuyguc/native-agent-api-claude`, `-codex`, `-edge` | amd64 and arm64, tags `<version>` and `<major>.<minor>` (no `latest`), SBOM and provenance from BuildKit |
-| Attestations | GitHub attestations of the repository | Signed build provenance of every archive and image |
+| Binaries | GitHub release of the tag | `tar.gz` per platform (linux and darwin, amd64 and arm64), an SBOM per archive, `checksums.txt`, `checksums.txt.sigstore.json` |
+| Images | `ghcr.io/emreuyguc/native-agent-api-claude`, `-codex`, `-edge` | amd64 and arm64, tags `<version>` and `<major>.<minor>`. A release sets no `latest` tag; the old `latest` stays on 0.2.1, SBOM and provenance from BuildKit |
+| Attestations | GitHub attestations of the repository | Signed build provenance of every archive and image. `checksums.txt.sigstore.json` holds the archives' attestation as a file |
 
 The release notes are the tag's section of [CHANGELOG.md](../CHANGELOG.md).
 [GoReleaser](https://goreleaser.com) builds the binaries from [`.goreleaser.yaml`](../.goreleaser.yaml)
@@ -67,6 +67,9 @@ gh attestation verify native-agent-api_0.2.0_linux_amd64.tar.gz --repo emreuyguc
 gh attestation verify oci://ghcr.io/emreuyguc/native-agent-api-claude:0.2.0 --repo emreuyguc/native-agent-api \
   --signer-workflow emreuyguc/native-agent-api/.github/workflows/release.yml --source-ref refs/tags/v0.2.0
 ```
+
+With `--bundle checksums.txt.sigstore.json` from the release, an archive verifies without the
+GitHub attestation API.
 
 To check only the download, compare it with `checksums.txt`:
 
