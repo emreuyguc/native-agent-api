@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- Releases: `checksums.txt.sigstore.json` holds the signed build provenance of the archives.
+  `gh attestation verify <archive> --bundle checksums.txt.sigstore.json` checks it without the
+  GitHub attestation API.
+
+### Changed
+
+- Releases: each image builds on a native amd64 or arm64 runner.
+
 ## [0.2.1] - 2026-11-12
 
 A security release: the images no longer contain the critical zlib vulnerability CVE-2026-4738.
