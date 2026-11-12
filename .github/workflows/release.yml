@@ -100,20 +100,21 @@ jobs:
         with:
           subject-checksums: dist/checksums.txt
 
-  # Each image is pushed by digest only; verify adds the version tags.
+  # Each image builds once per architecture on a native runner, without QEMU, and is pushed by
+  # digest only.
   images:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    name: images (${{ matrix.image }}, ${{ matrix.arch }})
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    timeout-minutes: 30
     needs: [prepare, check]
     permissions:
       contents: read
       packages: write # push to GHCR
-      id-token: write # sign the attestation with Sigstore
-      attestations: write
     strategy:
       fail-fast: false
       matrix:
         image: [claude, codex, edge]
+        arch: [amd64, arm64]
     env:
       IMAGE: ghcr.io/${{ github.repository_owner }}/native-agent-api-${{ matrix.image }}
     steps:
@@ -122,7 +123,6 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
@@ -137,24 +137,82 @@ jobs:
           flavor: latest=false
           tags: type=semver,pattern={{version}}
       - id: build
-        name: Push ${{ matrix.image }} image by digest (amd64 + arm64)
+        name: Push ${{ matrix.image }} image by digest (${{ matrix.arch }})
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: docker/${{ matrix.image }}/Dockerfile
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/${{ matrix.arch }}
           outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
           labels: ${{ steps.meta.outputs.labels }}
           sbom: true
           provenance: mode=max
-      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-name: ${{ env.IMAGE }}
-          subject-digest: ${{ steps.build.outputs.digest }}
-          push-to-registry: true
       - name: Record the digest
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/platforms"
+          printf '%s\n' "$DIGEST" >"$RUNNER_TEMP/platforms/$ARCH"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: platform-${{ matrix.image }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/platforms/${{ matrix.arch }}
+          if-no-files-found: error
+          retention-days: 1
+
+  # Joins the two architectures of each image into one index, pushed by digest only, and signs it.
+  manifest:
+    name: manifest (${{ matrix.image }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    needs: images
+    permissions:
+      packages: write # push the index to GHCR
+      id-token: write # sign the attestation with Sigstore
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [claude, codex, edge]
+    env:
+      IMAGE: ghcr.io/${{ github.repository_owner }}/native-agent-api-${{ matrix.image }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: platform-${{ matrix.image }}-*
+          path: ${{ runner.temp }}/platforms
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # `imagetools create` pushes only to a tag or a digest. The dry run prints the index with a
+      # trailing newline; without it, its digest is the digest of the pushed index.
+      - id: index
+        name: Push the ${{ matrix.image }} index by digest
+        run: |
+          cd "$RUNNER_TEMP/platforms"
+          set -- "$IMAGE@$(cat amd64)" "$IMAGE@$(cat arm64)"
+          docker buildx imagetools create --dry-run "$@" >index.json
+          digest=sha256:$(printf '%s' "$(cat index.json)" | sha256sum | cut -d' ' -f1)
+          docker buildx imagetools create --metadata-file meta.json --tag "$IMAGE@$digest" "$@"
+          pushed=$(jq -r '."containerimage.descriptor".digest' meta.json)
+          if [ "$pushed" != "$digest" ]; then
+            echo "::error::pushed $pushed, expected $digest"
+            exit 1
+          fi
+          echo "digest=$digest" >>"$GITHUB_OUTPUT"
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.index.outputs.digest }}
+          push-to-registry: true
+      - name: Record the digest
+        env:
+          DIGEST: ${{ steps.index.outputs.digest }}
           NAME: ${{ matrix.image }}
         run: |
           mkdir -p "$RUNNER_TEMP/digests"
@@ -171,7 +229,7 @@ jobs:
   verify:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    needs: [prepare, binaries, images]
+    needs: [prepare, binaries, manifest]
     permissions:
       contents: write # read the draft release and publish it
       packages: write # add the version tags to the images
