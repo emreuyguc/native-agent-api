@@ -1,2 +1,2 @@
 # Grype for `make scan-images`. Only the FROM line is used; Dependabot updates it.
-FROM anchore/grype:v0.121.0@sha256:621d56d1d68106b787022c81546f7e0a36202a25d1239f0c20195fab8c16f7ea
+FROM anchore/grype:v0.121.2@sha256:6a36234da13f9faa327306ac0b3dab3405cfa2b4eb20c8f904125a8707863913
