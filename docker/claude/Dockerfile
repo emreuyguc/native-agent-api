@@ -32,7 +32,7 @@ RUN --mount=type=bind,source=.git,target=.git \
         -X github.com/emreuyguc/native-agent-api/internal/buildinfo.Date=$(git show -s --format=%cI HEAD)" \
       -o /out/native-agent-api ./cmd/native-agent-api
 
-FROM alpine:3.24.3@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS claude-download
+FROM alpine:3.24.4@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf AS claude-download
 ARG TARGETARCH
 WORKDIR /download
 SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
@@ -49,7 +49,7 @@ RUN set -eu; \
     echo "${checksum}  claude" | sha256sum -c -; \
     chmod 0755 claude
 
-FROM alpine:3.24.3@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS runtime
+FROM alpine:3.24.4@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf AS runtime
 LABEL org.opencontainers.image.title="native-agent-api-claude" \
       org.opencontainers.image.description="native-agent-api with the native Claude Code CLI"
 # bash: Claude Code's Bash tool accepts only bash or zsh, and Codex prefers bash over sh.
